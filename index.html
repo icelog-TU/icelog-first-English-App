@@ -309,6 +309,42 @@ select option{background:var(--bg2);color:var(--text)}
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:3px}
 
+/* ── highlight & notes ── */
+.s-card.hl{border-left-color:#f59e0b;background:rgba(245,158,11,.04)}
+.hl-btn{
+  background:none;border:none;cursor:pointer;font-size:1.05rem;
+  padding:2px 4px;line-height:1;opacity:.22;transition:.2s;flex-shrink:0;
+}
+.hl-btn:hover{opacity:.7}
+.hl-btn.on{opacity:1;filter:drop-shadow(0 0 5px rgba(245,158,11,.8))}
+.notes-panel{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.notes-lbl{font-size:.67rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:7px}
+.notes-ta{
+  width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);
+  border-radius:3px;padding:9px 12px;font-size:.86rem;font-family:inherit;
+  color:var(--text);resize:vertical;min-height:65px;line-height:1.65;transition:border-color .2s;
+}
+.notes-ta:focus{outline:none;border-color:var(--g1)}
+.notes-ta::placeholder{color:var(--text3)}
+.chat-wrap{margin-top:9px;display:none}
+.chat-wrap.open{display:block}
+.chat-msgs{max-height:200px;overflow-y:auto;margin-bottom:8px;display:flex;flex-direction:column;gap:7px}
+.chat-msgs::-webkit-scrollbar{width:3px}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.chat-u{text-align:right}
+.chat-u span{
+  display:inline-block;background:rgba(94,66,166,.22);border:1px solid rgba(94,66,166,.3);
+  border-radius:10px 10px 2px 10px;padding:6px 11px;max-width:88%;text-align:left;
+  font-size:.83rem;color:var(--text2);line-height:1.55;
+}
+.chat-a span{
+  display:inline-block;background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:2px 10px 10px 10px;padding:6px 11px;max-width:95%;
+  font-size:.83rem;color:var(--text2);line-height:1.55;
+}
+.chat-row{display:flex;gap:6px;margin-top:5px}
+.chat-row input{flex:1;font-size:.84rem;padding:6px 11px}
+
 /* ── gradient text utility ── */
 .grad-text{
   background:var(--gradient);
@@ -448,6 +484,7 @@ input[type=range]::-moz-range-thumb{
   <button class="tab on"  onclick="showTab('today',this)"   >📝&ensp;今日學習</button>
   <button class="tab"     onclick="showTab('history',this)" >📅&ensp;歷史紀錄</button>
   <button class="tab"     onclick="showTab('practice',this)">🧠&ensp;練習模式</button>
+  <button class="tab"     onclick="showTab('notes',this)"   >⭐&ensp;重點筆記</button>
 </nav>
 
 <!-- TODAY -->
@@ -498,6 +535,12 @@ input[type=range]::-moz-range-thumb{
   <div id="prac-list"></div>
 </section>
 
+<!-- NOTES (重點筆記) -->
+<section class="page" id="page-notes">
+  <div class="sec-title">⭐ 重點筆記</div>
+  <div id="notes-list"></div>
+</section>
+
 <!-- Dictionary popup -->
 <div id="dict">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -537,8 +580,9 @@ let ttsUtter  = null;
 let playId    = null;
 let playMode  = null;
 let shadowTimer = null;
-let ttsVolume = parseFloat(localStorage.getItem('tts_vol') || '0.9');
-let recVolume = parseFloat(localStorage.getItem('rec_vol') || '0.5');
+let ttsVolume  = parseFloat(localStorage.getItem('tts_vol') || '0.9');
+let recVolume  = parseFloat(localStorage.getItem('rec_vol') || '0.5');
+let highlights = JSON.parse(localStorage.getItem('eng_highlights') || '{}');
 
 const $   = id => document.getElementById(id);
 const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -647,10 +691,18 @@ function renderResults(sentences,targetId){
   el.innerHTML=`<div class="sec-title">翻譯結果（${sentences.length} 句）</div>`+sentences.map((s,i)=>cardHTML(s,i)).join('');
 }
 
-function cardHTML(s,i){
+function cardHTML(s,i,opts){
+  const o=opts||{};
+  const numLabel=o.numLabel!==undefined?o.numLabel:`第 ${i+1} 句`;
+  const showRec=o.showRec!==false;
+  const hl=!!highlights[s.id];
   return `
-  <div class="s-card" id="card-${s.id}">
-    <div class="s-num">第 ${i+1} 句</div>
+  <div class="s-card${hl?' hl':''}" id="card-${s.id}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+      <div class="s-num" style="margin:0">${numLabel}</div>
+      <button class="hl-btn${hl?' on':''}" id="hlbtn-${s.id}"
+        onclick="toggleHighlight('${s.id}')" title="${hl?'取消標記':'標記為重點'}">⭐</button>
+    </div>
     <div class="zh">🇹🇼&ensp;${esc(s.chinese)}</div>
     <div class="en">🇺🇸&ensp;${wordify(s.english)}</div>
     <div class="acts">
@@ -659,11 +711,162 @@ function cardHTML(s,i){
         <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
         <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">🎧 跟讀</button>
       </div>
-      <button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">🎤</button>
-      <span id="rp-${s.id}"></span>
+      ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">🎤</button><span id="rp-${s.id}"></span>`:''}
+    </div>
+    ${hl?notesPanelHTML(s.id):''}
+  </div>`;
+}
+
+function notesPanelHTML(id){
+  const h=highlights[id]||{};
+  const note=h.note||'';
+  const disc=h.discussion||[];
+  const chatOpen=disc.length>0;
+  const msgs=disc.map(m=>
+    `<div class="chat-${m.role==='user'?'u':'a'}"><span>${esc(m.content).replace(/\n/g,'<br>')}</span></div>`
+  ).join('');
+  return `
+  <div class="notes-panel" id="notes-panel-${id}">
+    <div class="notes-lbl">📝 我的筆記</div>
+    <textarea class="notes-ta" id="note-ta-${id}"
+      placeholder="輸入你的想法、疑問…&#10;例如：這個用法跟我想的哪裡不同？跟哪個句子類似？"
+      onblur="saveNote('${id}',this.value)">${esc(note)}</textarea>
+    <div style="margin-top:8px">
+      <button class="btn btn-ghost btn-sm" onclick="toggleAIChat('${id}')">🤖 與 AI 討論</button>
+    </div>
+    <div class="chat-wrap${chatOpen?' open':''}" id="aichat-${id}">
+      <div class="chat-msgs" id="chat-msgs-${id}">${msgs}</div>
+      <div class="chat-row">
+        <input type="text" id="chat-q-${id}" placeholder="輸入問題…（Enter 送出）"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI('${id}');}">
+        <button class="btn btn-solid btn-sm" onclick="sendAI('${id}')">送出</button>
+      </div>
     </div>
   </div>`;
 }
+
+// ── highlight & notes ─────────────────────────────────────────
+function saveHighlights(){ localStorage.setItem('eng_highlights',JSON.stringify(highlights)); }
+
+function toggleHighlight(id){
+  const s=sMap[id]; if(!s) return;
+  // Save any unsaved textarea content first
+  document.querySelectorAll('.notes-ta').forEach(ta=>{
+    const tid=ta.id.replace('note-ta-','');
+    if(highlights[tid]) highlights[tid].note=ta.value;
+  });
+  if(highlights[id]){
+    delete highlights[id];
+  } else {
+    let date=today();
+    for(const d of Object.keys(sessions)){
+      if(sessions[d].find(x=>x.id===id)){date=d;break;}
+    }
+    highlights[id]={note:'',discussion:[],date,chinese:s.chinese,english:s.english};
+  }
+  saveHighlights();
+  // Re-render whichever tab is active
+  const active=document.querySelector('.page.on')?.id;
+  if(active==='page-today')  renderResults(todayData,'results');
+  else if(active==='page-history')  renderHistory();
+  else if(active==='page-notes')    renderNotes();
+}
+
+function saveNote(id,text){
+  if(!highlights[id]) return;
+  highlights[id].note=text;
+  saveHighlights();
+}
+
+function toggleAIChat(id){
+  const wrap=document.getElementById('aichat-'+id);
+  if(wrap) wrap.classList.toggle('open');
+}
+
+async function sendAI(id){
+  const s=sMap[id]; if(!s) return;
+  const key=localStorage.getItem('anthropic_key');
+  if(!key){alert('請先在設定中輸入 API 金鑰');return;}
+  const inputEl=document.getElementById('chat-q-'+id);
+  const question=(inputEl?.value||'').trim();
+  if(!question) return;
+  // Save textarea note before we read discussion
+  const ta=document.getElementById('note-ta-'+id);
+  if(ta&&highlights[id]) highlights[id].note=ta.value;
+  const note=highlights[id]?.note||'';
+  const disc=highlights[id]?.discussion||[];
+  // Show user message immediately
+  const msgsEl=document.getElementById('chat-msgs-'+id);
+  if(msgsEl){
+    msgsEl.insertAdjacentHTML('beforeend',
+      `<div class="chat-u"><span>${esc(question)}</span></div>`+
+      `<div class="chat-a" id="ai-typing-${id}"><span style="opacity:.5">AI 正在思考中…</span></div>`);
+    msgsEl.scrollTop=msgsEl.scrollHeight;
+  }
+  inputEl.value='';
+  const sendBtn=inputEl?.nextElementSibling;
+  if(sendBtn) sendBtn.disabled=true;
+  disc.push({role:'user',content:question});
+  const sysMsg=`你是英文學習助手，幫助學習者深入理解英文句子。請用繁體中文回答，精簡且具體。
+學習者正在學習這個句子：
+中文：${s.chinese}
+英文：${s.english}${note?`\n學習者的筆記：${note}`:''}`;
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'gpt-4o-mini',max_tokens:700,
+        messages:[{role:'system',content:sysMsg},...disc]})
+    });
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||res.status);}
+    const data=await res.json();
+    const reply=data.choices[0].message.content;
+    const typing=document.getElementById('ai-typing-'+id);
+    if(typing) typing.querySelector('span').innerHTML=esc(reply).replace(/\n/g,'<br>');
+    disc.push({role:'assistant',content:reply});
+    if(highlights[id]) highlights[id].discussion=disc;
+    saveHighlights();
+    if(msgsEl) msgsEl.scrollTop=msgsEl.scrollHeight;
+  }catch(err){
+    const typing=document.getElementById('ai-typing-'+id);
+    if(typing) typing.querySelector('span').innerHTML=`<span style="color:#f87171">錯誤：${esc(err.message)}</span>`;
+  }finally{
+    if(sendBtn) sendBtn.disabled=false;
+  }
+}
+
+function renderNotes(){
+  const ids=Object.keys(highlights);
+  if(!ids.length){
+    $('notes-list').innerHTML=`<div class="empty">⭐<br>還沒有標記任何重點<br><span style="font-size:.82rem">點句子右上角的 ⭐ 按鈕來標記重點句子</span></div>`;
+    return;
+  }
+  // Group by date, newest first
+  const byDate={};
+  ids.forEach(id=>{
+    const h=highlights[id];
+    if(!byDate[h.date]) byDate[h.date]=[];
+    byDate[h.date].push({id,...h});
+  });
+  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  $('notes-list').innerHTML=dates.map(d=>{
+    const items=byDate[d];
+    return `
+    <button class="hist-btn" onclick="toggleHist('notes-${d}')">
+      <span>📅&ensp;${d}</span>
+      <span class="badge">${items.length} 個重點</span>
+    </button>
+    <div class="hist-detail open" id="hd-notes-${d}">
+      ${items.map(h=>{
+        sMap[h.id]={id:h.id,chinese:h.chinese,english:h.english};
+        return cardHTML({id:h.id,chinese:h.chinese,english:h.english},0,
+          {numLabel:'⭐ 重點',showRec:false});
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ── end highlight & notes ──────────────────────────────────────
 
 document.addEventListener('click', e=>{
   const pb=e.target.closest('[data-play]');
@@ -878,6 +1081,7 @@ function showTab(name,btn){
   $(`page-${name}`).classList.add('on');btn.classList.add('on');
   if(name==='history')  renderHistory();
   if(name==='practice') renderPracticeOpts();
+  if(name==='notes')    renderNotes();
 }
 
 function renderHistory(){
@@ -894,17 +1098,7 @@ function renderHistory(){
       <span class="badge">${ss.length} 句</span>
     </button>
     <div class="hist-detail" id="hd-${d}">
-      ${ss.map((s,i)=>`
-      <div class="s-card">
-        <div class="s-num">第 ${i+1} 句</div>
-        <div class="zh">🇹🇼&ensp;${esc(s.chinese)}</div>
-        <div class="en">🇺🇸&ensp;${wordify(s.english)}</div>
-        <div class="acts play-grp">
-          <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">▶ 一次</button>
-          <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
-          <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習">🎧 跟讀</button>
-        </div>
-      </div>`).join('')}
+      ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
     </div>`;
   }).join('');
 }
@@ -950,17 +1144,7 @@ function filterHistory(query){
       <span class="badge">${matched.length} 筆符合</span>
     </button>
     <div class="hist-detail open" id="hd-search-${d}">
-      ${matched.map((s,i)=>`
-      <div class="s-card">
-        <div class="s-num">${d}</div>
-        <div class="zh">🇹🇼&ensp;${highlight(s.chinese,q)}</div>
-        <div class="en">🇺🇸&ensp;${highlight(s.english,q)}</div>
-        <div class="acts play-grp">
-          <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">▶ 一次</button>
-          <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
-          <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習">🎧 跟讀</button>
-        </div>
-      </div>`).join('')}
+      ${matched.map((s,i)=>cardHTML(s,i,{numLabel:d,showRec:false})).join('')}
     </div>`;
   });
 
