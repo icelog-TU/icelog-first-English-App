@@ -324,6 +324,70 @@ select option{background:var(--bg2);color:var(--text)}
   background:rgba(183,78,145,.18)!important;
 }
 .play-btn.p-dim{opacity:.35}
+
+/* ── header brand hover ── */
+.header-brand{cursor:pointer;transition:opacity .2s}
+.header-brand:hover{opacity:.75}
+
+/* ── now-playing bar ── */
+#now-playing{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--bg2);
+  border-top:1px solid var(--border2);
+  padding:10px 14px;
+  display:none;align-items:center;gap:10px;
+  z-index:100;
+  box-shadow:0 -8px 28px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+#now-playing::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--gradient);
+}
+#np-mode{
+  font-size:.68rem;font-weight:700;letter-spacing:.06em;
+  color:var(--g2);white-space:nowrap;text-transform:uppercase;
+  min-width:40px;
+}
+#np-info{
+  flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;overflow:hidden;
+}
+#np-num{
+  font-size:.72rem;font-weight:700;color:var(--g2);white-space:nowrap;
+  background:rgba(183,78,145,.15);border:1px solid rgba(183,78,145,.3);
+  border-radius:2px;padding:1px 6px;
+}
+#np-zh{
+  font-size:.88rem;color:var(--text2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.np-btn{
+  background:transparent;border:1px solid var(--border);border-radius:3px;
+  color:var(--text2);font-size:.72rem;padding:5px 10px;cursor:pointer;
+  white-space:nowrap;transition:.2s;font-family:inherit;
+  letter-spacing:.04em;
+}
+.np-btn:hover{border-color:var(--border2);color:var(--text)}
+.np-btn.stop{border-color:var(--g2);color:var(--g2)}
+.np-btn.stop:hover{background:rgba(183,78,145,.15)}
+
+/* ── volume slider ── */
+.vol-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.vol-pct{font-size:.8rem;color:var(--text2);min-width:36px;text-align:right}
+input[type=range]{
+  -webkit-appearance:none;flex:1;height:4px;
+  background:var(--border);border-radius:2px;
+  outline:none;border:none;padding:0;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--g2);cursor:pointer;
+  box-shadow:0 0 6px rgba(183,78,145,.5);
+}
+input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;
+  background:var(--g2);cursor:pointer;border:none;
+}
 </style>
 </head>
 <body>
@@ -348,6 +412,21 @@ select option{background:var(--bg2);color:var(--text)}
     <h2>⚙️ 設定</h2>
     <label class="lbl" style="margin-top:14px">OpenAI API 金鑰</label>
     <input type="password" id="cfg-key" class="mb3">
+
+    <label class="lbl" style="margin-top:6px">🔊 AI 語音音量</label>
+    <div class="vol-row">
+      <input type="range" id="tts-vol" min="0" max="1" step="0.05"
+             oninput="updateVol('tts',this.value)">
+      <span class="vol-pct" id="tts-vol-pct"></span>
+    </div>
+
+    <label class="lbl">🎤 錄音回放音量</label>
+    <div class="vol-row" style="margin-bottom:20px">
+      <input type="range" id="rec-vol" min="0" max="1" step="0.05"
+             oninput="updateVol('rec',this.value)">
+      <span class="vol-pct" id="rec-vol-pct"></span>
+    </div>
+
     <div class="row" style="margin-top:4px">
       <button class="btn btn-solid" style="flex:1;justify-content:center" onclick="saveSettings()">儲存</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="hideModal('cfg-modal')">取消</button>
@@ -357,7 +436,7 @@ select option{background:var(--bg2);color:var(--text)}
 
 <!-- Header -->
 <header>
-  <div class="header-brand">
+  <div class="header-brand" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到頂部">
     <span style="font-size:1.4rem;filter:drop-shadow(0 0 6px rgba(183,78,145,.6))">🎓</span>
     <h1>英文<span>學習</span>助手</h1>
   </div>
@@ -428,6 +507,17 @@ select option{background:var(--bg2);color:var(--text)}
   <div id="dict-body"></div>
 </div>
 
+<!-- Now Playing Bar -->
+<div id="now-playing">
+  <span id="np-mode"></span>
+  <div id="np-info">
+    <span id="np-num"></span>
+    <span id="np-zh"></span>
+  </div>
+  <button class="np-btn" onclick="scrollToPlaying()" title="定位到這一句">📍 定位</button>
+  <button class="np-btn stop" onclick="stopPlayback()">⏹ 停止</button>
+</div>
+
 <script>
 // ── state ──────────────────────────────────────────
 let sessions  = JSON.parse(localStorage.getItem('eng_sessions') || '{}');
@@ -438,9 +528,11 @@ let recorder  = null;
 let recFor    = null;
 let recChunks = [];
 let ttsUtter  = null;
-let playId    = null;   // 目前播放的句子 id
-let playMode  = null;   // 'once' | 'loop' | 'shadow'
-let shadowTimer = null; // 跟讀模式的 setTimeout
+let playId    = null;
+let playMode  = null;
+let shadowTimer = null;
+let ttsVolume = parseFloat(localStorage.getItem('tts_vol') || '0.9');
+let recVolume = parseFloat(localStorage.getItem('rec_vol') || '0.5');
 
 const $   = id => document.getElementById(id);
 const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -477,7 +569,22 @@ function setupKey(){
 
 function openSettings(){
   $('cfg-key').value = localStorage.getItem('anthropic_key')||'';
+  $('tts-vol').value = ttsVolume;
+  $('tts-vol-pct').textContent = Math.round(ttsVolume*100)+'%';
+  $('rec-vol').value = recVolume;
+  $('rec-vol-pct').textContent = Math.round(recVolume*100)+'%';
   $('cfg-modal').classList.remove('hide');
+}
+
+function updateVol(type, val){
+  const v = parseFloat(val);
+  if(type==='tts'){
+    ttsVolume=v; localStorage.setItem('tts_vol', v);
+    $('tts-vol-pct').textContent=Math.round(v*100)+'%';
+  } else {
+    recVolume=v; localStorage.setItem('rec_vol', v);
+    $('rec-vol-pct').textContent=Math.round(v*100)+'%';
+  }
 }
 
 function saveSettings(){
@@ -575,6 +682,45 @@ function stopPlayback(){
     });
   }
   playId=null; playMode=null;
+  hideNowPlaying();
+}
+
+function showNowPlaying(id, mode){
+  const s=sMap[id]; if(!s) return;
+  // Find sentence number: search today first, then history
+  let num='?';
+  const ti=todayData.findIndex(x=>x.id===id);
+  if(ti>=0){ num=ti+1; }
+  else {
+    for(const d of Object.keys(sessions)){
+      const i=sessions[d].findIndex(x=>x.id===id);
+      if(i>=0){ num=i+1; break; }
+    }
+  }
+  const modeLabel={once:'▶ 播放',loop:'🔁 循環',shadow:'🎧 跟讀'}[mode]||mode;
+  $('np-mode').textContent=modeLabel;
+  $('np-num').textContent=`第 ${num} 句`;
+  $('np-zh').textContent=s.chinese;
+  $('now-playing').style.display='flex';
+  // Add bottom padding so content isn't hidden behind bar
+  document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom='70px');
+}
+
+function hideNowPlaying(){
+  $('now-playing').style.display='none';
+  document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom='');
+}
+
+function scrollToPlaying(){
+  if(!playId) return;
+  const card=document.getElementById(`card-${playId}`);
+  if(card){
+    card.scrollIntoView({behavior:'smooth',block:'center'});
+    // Flash highlight
+    card.style.borderColor='var(--g2)';
+    card.style.boxShadow='0 0 0 2px rgba(183,78,145,.4)';
+    setTimeout(()=>{ card.style.borderColor=''; card.style.boxShadow=''; },1800);
+  }
 }
 
 function setPlayUI(id, activeMode){
@@ -595,14 +741,20 @@ function handlePlay(mode, id){
   const s=sMap[id]; if(!s) return;
   playId=id; playMode=mode;
   setPlayUI(id, mode);
+  showNowPlaying(id, mode);
   if(mode==='once')   playOnce(id,s);
   else if(mode==='loop')   playLoop(id,s);
   else if(mode==='shadow') playShadow(id,s);
 }
 
+function mkUtter(text){
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-US'; u.rate=0.85; u.volume=ttsVolume;
+  return u;
+}
+
 function playOnce(id,s){
-  ttsUtter=new SpeechSynthesisUtterance(s.english);
-  ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+  ttsUtter=mkUtter(s.english);
   ttsUtter.onend=()=>{ stopPlayback(); };
   speechSynthesis.speak(ttsUtter);
 }
@@ -610,8 +762,7 @@ function playOnce(id,s){
 function playLoop(id,s){
   function doLoop(){
     if(playId!==id||playMode!=='loop') return;
-    ttsUtter=new SpeechSynthesisUtterance(s.english);
-    ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+    ttsUtter=mkUtter(s.english);
     ttsUtter.onend=()=>{
       if(playId===id&&playMode==='loop')
         shadowTimer=setTimeout(doLoop,400);
@@ -625,13 +776,12 @@ function playShadow(id,s){
   function doShadow(){
     if(playId!==id||playMode!=='shadow') return;
     let t0=null;
-    ttsUtter=new SpeechSynthesisUtterance(s.english);
-    ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+    ttsUtter=mkUtter(s.english);
     ttsUtter.onstart=()=>{ t0=Date.now(); };
     ttsUtter.onend=()=>{
       if(playId!==id||playMode!=='shadow') return;
       const spoken=t0?Date.now()-t0:2000;
-      const pause=Math.max(spoken,1200); // 停頓時間 = 朗讀時間（最少 1.2 秒）
+      const pause=Math.max(spoken,1200);
       shadowTimer=setTimeout(doShadow, pause);
     };
     speechSynthesis.speak(ttsUtter);
@@ -664,7 +814,10 @@ async function toggleRec(id){
     alert('無法存取麥克風，請確認瀏覽器已允許麥克風權限。');
   }
 }
-function playRec(id){ const u=recordings[id]; if(u) new Audio(u).play(); }
+function playRec(id){
+  const u=recordings[id]; if(!u) return;
+  const a=new Audio(u); a.volume=recVolume; a.play();
+}
 
 async function lookupWord(word){
   if(!word) return;
