@@ -436,7 +436,7 @@ input[type=range]::-moz-range-thumb{
 
 <!-- Header -->
 <header>
-  <div class="header-brand" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到頂部">
+  <div class="header-brand" onclick="location.reload()" title="重新整理頁面">
     <span style="font-size:1.4rem;filter:drop-shadow(0 0 6px rgba(183,78,145,.6))">🎓</span>
     <h1>英文<span>學習</span>助手</h1>
   </div>
@@ -500,9 +500,15 @@ input[type=range]::-moz-range-thumb{
 
 <!-- Dictionary popup -->
 <div id="dict">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <strong id="dict-word" class="grad-text" style="font-size:1.05rem"></strong>
-    <button onclick="closeDict()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1rem;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">✕</button>
+    <button onclick="closeDict()"
+      style="background:rgba(255,255,255,.1);border:1px solid var(--border2);
+             cursor:pointer;color:var(--text);font-size:1rem;border-radius:50%;
+             width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+             flex-shrink:0;transition:.2s;line-height:1"
+      onmouseover="this.style.background='rgba(183,78,145,.3)'"
+      onmouseout="this.style.background='rgba(255,255,255,.1)'">✕</button>
   </div>
   <div id="dict-body"></div>
 </div>
@@ -839,11 +845,11 @@ async function lookupWord(word){
         if(d.example) html+=`<p style="font-size:.78rem;color:var(--text3);margin-left:10px;font-style:italic">"${esc(d.example)}"</p>`;
       });
     });
-    html+=`<p style="margin-top:10px;font-size:.78rem"><a href="https://dictionary.cambridge.org/dictionary/english/${word}" target="_blank" style="color:var(--g2);border-bottom:1px dotted rgba(183,78,145,.5)">劍橋字典 →</a></p>`;
+    html+=`<p style="margin-top:10px;font-size:.78rem"><a href="https://dictionary.cambridge.org/dictionary/english-chinese-traditional/${word}" target="_blank" style="color:var(--g2);border-bottom:1px dotted rgba(183,78,145,.5)">劍橋英漢字典 →</a></p>`;
     $('dict-body').innerHTML=html;
   }catch(err){
     $('dict-body').innerHTML=`<p style="font-size:.82rem;color:var(--text3)">${err.message}</p>
-      <p style="margin-top:8px;font-size:.78rem"><a href="https://dictionary.cambridge.org/dictionary/english/${word}" target="_blank" style="color:var(--g2)">劍橋字典查詢 →</a></p>`;
+      <p style="margin-top:8px;font-size:.78rem"><a href="https://dictionary.cambridge.org/dictionary/english-chinese-traditional/${word}" target="_blank" style="color:var(--g2)">劍橋英漢字典查詢 →</a></p>`;
   }
 }
 function closeDict(){ $('dict').classList.remove('show'); }
@@ -992,6 +998,29 @@ function startPractice(){
 }
 
 init();
+
+// ── 背景持續播放修正 ────────────────────────────────
+// iOS Safari 在 DOM 變動或切頁時會偷暫停 TTS，每 250ms 偵測並恢復
+setInterval(()=>{
+  if(playId && playMode && speechSynthesis.paused){
+    speechSynthesis.resume();
+  }
+}, 250);
+
+// 從其他分頁/App 切回來時，恢復播放
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden || !playId || !playMode) return;
+  if(speechSynthesis.paused){
+    speechSynthesis.resume();
+  } else if(!speechSynthesis.speaking && !speechSynthesis.pending){
+    // TTS 被完全停掉了，重新啟動
+    const s = sMap[playId];
+    if(s){
+      if(playMode==='loop')   playLoop(playId, s);
+      else if(playMode==='shadow') playShadow(playId, s);
+    }
+  }
+});
 </script>
 </body>
 </html>
