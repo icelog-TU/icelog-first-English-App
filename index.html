@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>英文學習助手</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;background:#eef2f7;color:#1a202c;min-height:100vh}
+
+/* overlay / modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:200}
+.overlay.hide{display:none}
+.modal{background:#fff;border-radius:16px;padding:30px;width:min(480px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.2)}
+
+/* header */
+header{background:linear-gradient(135deg,#2b6cb0,#4299e1);color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:1.1rem;font-weight:700}
+
+/* tabs */
+.tabs{background:#fff;display:flex;border-bottom:2px solid #e2e8f0;position:sticky;top:0;z-index:10}
+.tab{flex:1;padding:12px 6px;text-align:center;font-weight:600;font-size:.83rem;cursor:pointer;border:none;background:none;color:#718096;border-bottom:3px solid transparent;transition:.2s}
+.tab.on{color:#3182ce;border-bottom-color:#3182ce}
+.tab:hover{background:#ebf8ff;color:#3182ce}
+
+/* pages */
+.page{display:none;padding:16px;max-width:720px;margin:0 auto}
+.page.on{display:block}
+
+/* form */
+.lbl{display:block;font-size:.83rem;font-weight:600;color:#4a5568;margin-bottom:5px}
+textarea,input[type=text],input[type=password],select{width:100%;border:2px solid #e2e8f0;border-radius:8px;padding:9px 13px;font-size:.97rem;font-family:inherit;transition:border-color .2s}
+textarea{resize:vertical;min-height:130px;line-height:1.75}
+textarea:focus,input:focus,select:focus{outline:none;border-color:#3182ce}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;font-weight:600;font-size:.85rem;cursor:pointer;border:none;transition:.2s;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.blue{background:#3182ce;color:#fff}.blue:hover:not(:disabled){background:#2c5282}
+.green{background:#38a169;color:#fff}.green:hover:not(:disabled){background:#276749}
+.gray{background:#e2e8f0;color:#4a5568}.gray:hover{background:#cbd5e0}
+.red{background:#e53e3e;color:#fff}.red:hover{background:#c53030}
+.sm{padding:4px 10px;font-size:.78rem}
+.icon-btn{background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:.9rem;padding:6px 9px;transition:.2s;color:#4a5568}
+.icon-btn:hover{background:#ebf8ff;color:#3182ce;border-color:#bee3f8}
+.icon-btn.rec-on{background:#fff5f5;color:#e53e3e;border-color:#e53e3e;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* cards */
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:13px}
+.s-card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 5px rgba(0,0,0,.06);margin-bottom:9px;border-left:4px solid #3182ce}
+.s-num{font-size:.7rem;font-weight:700;color:#3182ce;letter-spacing:.05em;margin-bottom:5px}
+.zh{font-size:.92rem;color:#4a5568;margin-bottom:4px}
+.en{font-size:1.02rem;font-weight:600;color:#1a202c;line-height:1.65;margin-bottom:9px}
+.en .w{cursor:pointer;border-bottom:1.5px dashed #cbd5e0;transition:.15s}
+.en .w:hover{color:#3182ce;border-bottom-color:#3182ce}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rec-chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;background:#f0fff4;border:1px solid #9ae6b4;border-radius:8px;font-size:.75rem;color:#276749}
+
+/* history */
+.hist-btn{width:100%;text-align:left;padding:12px 15px;background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;font-size:.92rem;color:#2d3748;transition:.2s}
+.hist-btn:hover{border-color:#3182ce;color:#3182ce}
+.hist-detail{display:none;padding-left:10px}
+.hist-detail.open{display:block}
+
+/* practice */
+.p-card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 5px rgba(0,0,0,.06);margin-bottom:9px;border-left:4px solid #38a169}
+.answer{display:none;margin-top:8px;padding:8px 12px;background:#f0fff4;border-radius:8px;color:#276749;font-weight:600;font-size:.95rem}
+.answer.show{display:block}
+
+/* dict popup */
+#dict{position:fixed;bottom:16px;right:16px;width:295px;max-height:370px;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:50;display:none}
+#dict.show{display:block}
+
+/* misc */
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:700;background:#ebf8ff;color:#3182ce}
+.sec{font-size:.92rem;font-weight:700;color:#2d3748;padding-bottom:7px;border-bottom:2px solid #e2e8f0;margin-bottom:12px}
+.row{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.mb3{margin-bottom:11px}
+.empty{text-align:center;padding:40px 20px;color:#a0aec0;font-size:.95rem}
+</style>
+</head>
+<body>
+
+<!-- Setup modal -->
+<div class="overlay" id="setup-modal">
+  <div class="modal">
+    <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:7px">歡迎使用英文學習助手 🎓</h2>
+    <p style="font-size:.85rem;color:#718096;margin-bottom:16px">請輸入你的 OpenAI API 金鑰，它只存在你的瀏覽器裡，不會上傳任何地方。</p>
+    <label class="lbl">OpenAI API 金鑰</label>
+    <input type="password" id="setup-key" placeholder="sk-proj-..." class="mb3">
+    <p style="font-size:.8rem;color:#718096;margin-bottom:16px">到 <strong>platform.openai.com/api-keys</strong> → Create new secret key 可以取得金鑰</p>
+    <button class="btn blue" style="width:100%" onclick="setupKey()">開始使用</button>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay hide" id="cfg-modal">
+  <div class="modal">
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:13px">⚙️ 設定</h2>
+    <label class="lbl">OpenAI API 金鑰</label>
+    <input type="password" id="cfg-key" class="mb3">
+    <div class="row">
+      <button class="btn blue" style="flex:1" onclick="saveSettings()">儲存</button>
+      <button class="btn gray" style="flex:1" onclick="hideModal('cfg-modal')">取消</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.3rem">🎓</span><h1>英文學習助手</h1></div>
+  <button class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
+</header>
+
+<nav class="tabs">
+  <button class="tab on"  onclick="showTab('today',this)"   >📝 今日學習</button>
+  <button class="tab"     onclick="showTab('history',this)" >📅 歷史紀錄</button>
+  <button class="tab"     onclick="showTab('practice',this)">🧠 練習模式</button>
+</nav>
+
+<!-- TODAY -->
+<section class="page on" id="page-today">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+      <span style="font-weight:700;color:#2d3748">今天：<span id="today-date"></span></span>
+      <span class="badge" id="cnt">0 句</span>
+    </div>
+    <label class="lbl mb3">輸入中文句子（每行一句，建議 10–20 句）</label>
+    <textarea id="zh-in" placeholder="今天天氣真的很好。&#10;我想去公園散步。&#10;你有時間一起吃午飯嗎？"></textarea>
+    <div class="row">
+      <button class="btn blue" id="trans-btn" onclick="doTranslate()">🔄 翻譯</button>
+      <button class="btn green" id="save-btn" disabled onclick="saveSession()">💾 儲存今日</button>
+      <button class="btn gray" onclick="clearToday()">🗑️ 清除</button>
+    </div>
+  </div>
+  <div id="results"></div>
+</section>
+
+<!-- HISTORY -->
+<section class="page" id="page-history">
+  <div class="sec">學習紀錄</div>
+  <div id="hist-list"></div>
+</section>
+
+<!-- PRACTICE -->
+<section class="page" id="page-practice">
+  <div class="card">
+    <div class="sec">練習設定</div>
+    <label class="lbl mb3">選擇要練習的日期</label>
+    <select id="prac-sel"><option value="">-- 選擇日期 --</option></select>
+    <button class="btn green" style="margin-top:11px;width:100%" onclick="startPractice()">開始練習 💪</button>
+  </div>
+  <div id="prac-list"></div>
+</section>
+
+<!-- Dictionary popup -->
+<div id="dict">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+    <strong id="dict-word" style="color:#3182ce;font-size:1rem"></strong>
+    <button onclick="closeDict()" style="background:none;border:none;cursor:pointer;color:#718096;font-size:.95rem">✕</button>
+  </div>
+  <div id="dict-body"></div>
+</div>
+
+<script>
+// ── state ──────────────────────────────────────────
+let sessions  = JSON.parse(localStorage.getItem('eng_sessions') || '{}');
+let todayData = [];      // [{id,chinese,english}]
+let sMap      = {};      // id → sentence (for TTS/rec)
+let recordings= {};      // id → blob URL  (in-memory only)
+let recorder  = null;
+let recFor    = null;
+let recChunks = [];
+let ttsUtter  = null;
+
+// ── helpers ────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const today = () => new Date().toISOString().slice(0,10);
+
+// ── init ───────────────────────────────────────────
+function init(){
+  if(!localStorage.getItem('anthropic_key')) $('setup-modal').classList.remove('hide');
+  $('today-date').textContent = today();
+  $('zh-in').addEventListener('input', updateCnt);
+
+  if(sessions[today()]){
+    todayData = sessions[today()];
+    todayData.forEach(s => sMap[s.id] = s);
+    $('zh-in').value = todayData.map(s=>s.chinese).join('\n');
+    $('save-btn').disabled = false;
+    renderResults(todayData, 'results');
+  }
+  updateCnt();
+}
+
+function updateCnt(){
+  const n = $('zh-in').value.trim().split('\n').filter(l=>l.trim()).length;
+  $('cnt').textContent = n + ' 句';
+}
+
+// ── modals ─────────────────────────────────────────
+function hideModal(id){ $(id).classList.add('hide'); }
+
+function setupKey(){
+  const k = $('setup-key').value.trim();
+  if(!k.startsWith('sk-')){ alert('請輸入正確的 OpenAI API 金鑰（以 sk- 開頭）'); return; }
+  localStorage.setItem('anthropic_key', k);
+  hideModal('setup-modal');
+}
+
+function openSettings(){
+  $('cfg-key').value = localStorage.getItem('anthropic_key')||'';
+  $('cfg-modal').classList.remove('hide');
+}
+
+function saveSettings(){
+  const k = $('cfg-key').value.trim();
+  if(!k.startsWith('sk-')){ alert('請輸入正確的 API 金鑰'); return; }
+  localStorage.setItem('anthropic_key', k);
+  hideModal('cfg-modal');
+  alert('已更新！');
+}
+
+// ── translation ────────────────────────────────────
+async function doTranslate(){
+  const key = localStorage.getItem('anthropic_key');
+  if(!key){ alert('請先設定 API 金鑰'); return; }
+
+  const raw   = $('zh-in').value.trim();
+  if(!raw){ alert('請輸入中文句子'); return; }
+  const lines = raw.split('\n').filter(l=>l.trim());
+
+  const btn = $('trans-btn');
+  btn.innerHTML = '<span class="spin"></span> 翻譯中…';
+  btn.disabled  = true;
+
+  try{
+    const res = await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+key
+      },
+      body: JSON.stringify({
+        model:'gpt-4o-mini',
+        max_tokens:2048,
+        messages:[{
+          role:'user',
+          content:`請將以下中文句子逐行翻譯成自然流暢的英文口語。
+規則：每一行輸入對應一行輸出，只輸出英文翻譯，不要加任何說明或編號。
+
+${lines.join('\n')}`
+        }]
+      })
+    });
+
+    if(!res.ok){ const e=await res.json(); throw new Error(e.error?.message||'API 錯誤 '+res.status); }
+
+    const data = await res.json();
+    const enLines = data.choices[0].message.content.trim().split('\n').filter(l=>l.trim());
+
+    todayData = lines.map((zh,i)=>({
+      id: `s${Date.now()}_${i}`,
+      chinese: zh.trim(),
+      english: enLines[i]||''
+    }));
+    todayData.forEach(s=>sMap[s.id]=s);
+
+    renderResults(todayData,'results');
+    $('save-btn').disabled = false;
+
+  }catch(err){
+    alert('翻譯失敗：'+err.message);
+  }finally{
+    btn.innerHTML='🔄 翻譯';
+    btn.disabled=false;
+  }
+}
+
+// ── render ─────────────────────────────────────────
+function wordify(en){
+  return en.split(' ').map(tok=>{
+    const w = tok.replace(/[^a-zA-Z']/g,'');
+    if(!w) return esc(tok);
+    return `<span class="w" data-word="${w.toLowerCase()}">${esc(tok)}</span>`;
+  }).join(' ');
+}
+
+function renderResults(sentences, targetId){
+  const el = $(targetId);
+  if(!sentences.length){ el.innerHTML=''; return; }
+  el.innerHTML =
+    `<div class="sec">翻譯結果（${sentences.length} 句）</div>`+
+    sentences.map((s,i)=>cardHTML(s,i)).join('');
+}
+
+function cardHTML(s,i){
+  return `
+  <div class="s-card" id="card-${s.id}">
+    <div class="s-num">第 ${i+1} 句</div>
+    <div class="zh">🇹🇼 ${esc(s.chinese)}</div>
+    <div class="en">🇺🇸 ${wordify(s.english)}</div>
+    <div class="acts">
+      <button class="icon-btn" data-speak="${s.id}" title="播放朗讀">🔊</button>
+      <button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">🎤</button>
+      <span id="rp-${s.id}"></span>
+    </div>
+  </div>`;
+}
+
+// ── global event delegation ────────────────────────
+document.addEventListener('click', e=>{
+  const sp = e.target.closest('[data-speak]');
+  if(sp){ speak(sp.dataset.speak, sp); return; }
+  const rc = e.target.closest('[data-rec]');
+  if(rc){ toggleRec(rc.dataset.rec); return; }
+  const wd = e.target.closest('.w');
+  if(wd){ lookupWord(wd.dataset.word); return; }
+});
+
+// ── TTS ────────────────────────────────────────────
+function speak(id, btn){
+  const s = sMap[id]; if(!s) return;
+  if(ttsUtter){
+    speechSynthesis.cancel(); ttsUtter=null;
+    document.querySelectorAll('[data-speak]').forEach(b=>b.textContent='🔊');
+    if(btn?.textContent==='⏹️') return;
+  }
+  ttsUtter = new SpeechSynthesisUtterance(s.english);
+  ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+  ttsUtter.onstart = ()=>{ if(btn) btn.textContent='⏹️'; };
+  ttsUtter.onend   = ()=>{ ttsUtter=null; if(btn) btn.textContent='🔊'; };
+  speechSynthesis.speak(ttsUtter);
+}
+
+// ── recording ──────────────────────────────────────
+async function toggleRec(id){
+  if(recFor===id && recorder?.state==='recording'){ recorder.stop(); return; }
+  if(recorder?.state==='recording') recorder.stop();
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    recChunks=[]; recFor=id;
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = e=>recChunks.push(e.data);
+    recorder.onstop = ()=>{
+      const blob = new Blob(recChunks,{type:'audio/webm'});
+      const url  = URL.createObjectURL(blob);
+      recordings[id]=url;
+      const rp=$(`rp-${id}`);
+      if(rp) rp.innerHTML=`<span class="rec-chip">🎵 <button class="btn gray sm" onclick="playRec('${id}')">播放錄音</button></span>`;
+      const rb=$(`rb-${id}`);
+      if(rb){ rb.classList.remove('rec-on'); rb.textContent='🎤'; }
+      stream.getTracks().forEach(t=>t.stop());
+      recFor=null;
+    };
+    recorder.start();
+    const rb=$(`rb-${id}`);
+    if(rb){ rb.classList.add('rec-on'); rb.textContent='⏹️'; }
+  }catch{
+    alert('無法存取麥克風，請確認瀏覽器已允許麥克風權限。');
+  }
+}
+
+function playRec(id){ const u=recordings[id]; if(u) new Audio(u).play(); }
+
+// ── dictionary ─────────────────────────────────────
+async function lookupWord(word){
+  if(!word) return;
+  $('dict-word').textContent = word;
+  $('dict-body').innerHTML   = '<p style="font-size:.82rem;color:#718096">查詢中…</p>';
+  $('dict').classList.add('show');
+  try{
+    const r   = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    if(!r.ok) throw new Error('查無此字');
+    const [entry] = await r.json();
+    let html='';
+    const ph = entry.phonetics?.find(p=>p.text)||entry.phonetics?.[0];
+    if(ph?.text)  html+=`<p style="font-size:.82rem;color:#718096;margin-bottom:6px">${ph.text}</p>`;
+    if(ph?.audio) html+=`<audio controls src="${ph.audio}" style="width:100%;height:26px;margin-bottom:7px"></audio>`;
+    entry.meanings.slice(0,3).forEach(m=>{
+      html+=`<p style="margin:6px 0 3px"><span class="badge">${m.partOfSpeech}</span></p>`;
+      m.definitions.slice(0,2).forEach(d=>{
+        html+=`<p style="font-size:.82rem;margin:2px 0">• ${esc(d.definition)}</p>`;
+        if(d.example) html+=`<p style="font-size:.78rem;color:#718096;margin-left:9px;font-style:italic">"${esc(d.example)}"</p>`;
+      });
+    });
+    html+=`<p style="margin-top:9px;font-size:.78rem"><a href="https://dictionary.cambridge.org/dictionary/english/${word}" target="_blank" style="color:#3182ce">劍橋字典 →</a></p>`;
+    $('dict-body').innerHTML=html;
+  }catch(err){
+    $('dict-body').innerHTML=`<p style="font-size:.82rem;color:#718096">${err.message}</p>
+      <p style="margin-top:7px;font-size:.78rem"><a href="https://dictionary.cambridge.org/dictionary/english/${word}" target="_blank" style="color:#3182ce">劍橋字典查詢 →</a></p>`;
+  }
+}
+function closeDict(){ $('dict').classList.remove('show'); }
+
+// ── save / clear ───────────────────────────────────
+function saveSession(){
+  if(!todayData.length) return;
+  sessions[today()]=todayData;
+  localStorage.setItem('eng_sessions', JSON.stringify(sessions));
+  const btn=$('save-btn');
+  btn.textContent='✅ 已儲存！';
+  setTimeout(()=>{ btn.innerHTML='💾 儲存今日'; },2000);
+}
+
+function clearToday(){
+  if(todayData.length && !confirm('確定清除今日的翻譯結果嗎？')) return;
+  todayData.forEach(s=>delete sMap[s.id]);
+  todayData=[];
+  $('zh-in').value=''; $('results').innerHTML='';
+  $('save-btn').disabled=true; updateCnt();
+}
+
+// ── tabs ───────────────────────────────────────────
+function showTab(name, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  $(`page-${name}`).classList.add('on');
+  btn.classList.add('on');
+  if(name==='history')  renderHistory();
+  if(name==='practice') renderPracticeOpts();
+}
+
+// ── history ────────────────────────────────────────
+function renderHistory(){
+  const dates = Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  if(!dates.length){ $('hist-list').innerHTML='<div class="empty">📭 還沒有學習紀錄<br>先在今日學習頁面輸入並儲存句子</div>'; return; }
+  $('hist-list').innerHTML = dates.map(d=>{
+    const ss=sessions[d];
+    ss.forEach(s=>sMap[s.id]=s);
+    return `
+    <button class="hist-btn" onclick="toggleHist('${d}')">
+      <span>📅 ${d}</span><span class="badge">${ss.length} 句</span>
+    </button>
+    <div class="hist-detail" id="hd-${d}">
+      ${ss.map((s,i)=>`
+      <div class="s-card">
+        <div class="s-num">第 ${i+1} 句</div>
+        <div class="zh">🇹🇼 ${esc(s.chinese)}</div>
+        <div class="en">🇺🇸 ${wordify(s.english)}</div>
+        <div class="acts">
+          <button class="icon-btn" data-speak="${s.id}" title="播放">🔊</button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function toggleHist(d){ $(`hd-${d}`)?.classList.toggle('open'); }
+
+// ── practice ───────────────────────────────────────
+function renderPracticeOpts(){
+  const dates=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  $('prac-sel').innerHTML='<option value="">-- 選擇日期 --</option>'+
+    dates.map(d=>`<option value="${d}">${d}（${sessions[d].length} 句）</option>`).join('');
+}
+
+function startPractice(){
+  const d=$('prac-sel').value;
+  if(!d||!sessions[d]){ alert('請先選擇一個日期'); return; }
+  const ss=sessions[d];
+  ss.forEach(s=>sMap[s.id]=s);
+  $('prac-list').innerHTML=
+    `<div class="sec">${d} 的練習（${ss.length} 句）</div>`+
+    ss.map((s,i)=>`
+    <div class="p-card">
+      <div class="s-num">第 ${i+1} 句</div>
+      <div class="zh" style="font-size:.97rem;font-weight:700">🇹🇼 ${esc(s.chinese)}</div>
+      <input type="text" placeholder="試著翻譯成英文…" style="margin-top:8px">
+      <div class="acts" style="margin-top:7px">
+        <button class="btn gray sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">👁️ 顯示答案</button>
+        <button class="icon-btn" data-speak="${s.id}" title="聽正確發音">🔊</button>
+      </div>
+      <div class="answer">✅ ${esc(s.english)}</div>
+    </div>`).join('');
+}
+
+// ── start ──────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
