@@ -314,6 +314,16 @@ select option{background:var(--bg2);color:var(--text)}
   background:var(--gradient);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
+
+/* ── play buttons ── */
+.play-grp{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:0}
+.play-btn{font-size:.72rem;padding:5px 10px;letter-spacing:.03em;line-height:1.2;white-space:nowrap}
+.play-btn.p-active{
+  border-color:var(--g2)!important;
+  color:var(--g2)!important;
+  background:rgba(183,78,145,.18)!important;
+}
+.play-btn.p-dim{opacity:.35}
 </style>
 </head>
 <body>
@@ -385,6 +395,16 @@ select option{background:var(--bg2);color:var(--text)}
 <!-- HISTORY -->
 <section class="page" id="page-history">
   <div class="sec-title">學習紀錄</div>
+  <div style="position:relative;margin-bottom:14px">
+    <input type="text" id="hist-search"
+      placeholder="🔍  搜尋句子關鍵字（中文或英文）…"
+      oninput="filterHistory(this.value)"
+      style="padding-left:16px">
+    <span id="search-count"
+      style="position:absolute;right:12px;top:50%;transform:translateY(-50%);
+             font-size:.72rem;letter-spacing:.06em;color:var(--text3);pointer-events:none">
+    </span>
+  </div>
   <div id="hist-list"></div>
 </section>
 
@@ -418,6 +438,9 @@ let recorder  = null;
 let recFor    = null;
 let recChunks = [];
 let ttsUtter  = null;
+let playId    = null;   // 目前播放的句子 id
+let playMode  = null;   // 'once' | 'loop' | 'shadow'
+let shadowTimer = null; // 跟讀模式的 setTimeout
 
 const $   = id => document.getElementById(id);
 const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -518,7 +541,11 @@ function cardHTML(s,i){
     <div class="zh">🇹🇼&ensp;${esc(s.chinese)}</div>
     <div class="en">🇺🇸&ensp;${wordify(s.english)}</div>
     <div class="acts">
-      <button class="icon-btn" data-speak="${s.id}" title="播放朗讀">🔊</button>
+      <div class="play-grp">
+        <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">▶ 一次</button>
+        <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
+        <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">🎧 跟讀</button>
+      </div>
       <button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">🎤</button>
       <span id="rp-${s.id}"></span>
     </div>
@@ -526,26 +553,90 @@ function cardHTML(s,i){
 }
 
 document.addEventListener('click', e=>{
-  const sp=e.target.closest('[data-speak]');
-  if(sp){ speak(sp.dataset.speak,sp); return; }
+  const pb=e.target.closest('[data-play]');
+  if(pb){ handlePlay(pb.dataset.play, pb.dataset.pid); return; }
   const rc=e.target.closest('[data-rec]');
   if(rc){ toggleRec(rc.dataset.rec); return; }
   const wd=e.target.closest('.w');
   if(wd){ lookupWord(wd.dataset.word); return; }
 });
 
-function speak(id,btn){
-  const s=sMap[id]; if(!s) return;
-  if(ttsUtter){
-    speechSynthesis.cancel();ttsUtter=null;
-    document.querySelectorAll('[data-speak]').forEach(b=>b.textContent='🔊');
-    if(btn?.textContent==='⏹️') return;
+// ── playback labels / icons ──────────────────────────
+const PLAY_LABELS = {once:'▶ 一次', loop:'🔁 循環', shadow:'🎧 跟讀'};
+
+function stopPlayback(){
+  speechSynthesis.cancel();
+  if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
+  ttsUtter=null;
+  if(playId){
+    document.querySelectorAll(`.play-btn[data-pid="${playId}"]`).forEach(b=>{
+      b.textContent=PLAY_LABELS[b.dataset.play]||'▶';
+      b.classList.remove('p-active','p-dim');
+    });
   }
+  playId=null; playMode=null;
+}
+
+function setPlayUI(id, activeMode){
+  document.querySelectorAll(`.play-btn[data-pid="${id}"]`).forEach(b=>{
+    if(b.dataset.play===activeMode){
+      b.textContent='⏹ 停止';
+      b.classList.add('p-active'); b.classList.remove('p-dim');
+    } else {
+      b.textContent=PLAY_LABELS[b.dataset.play]||'▶';
+      b.classList.add('p-dim'); b.classList.remove('p-active');
+    }
+  });
+}
+
+function handlePlay(mode, id){
+  if(playId===id && playMode===mode){ stopPlayback(); return; }
+  stopPlayback();
+  const s=sMap[id]; if(!s) return;
+  playId=id; playMode=mode;
+  setPlayUI(id, mode);
+  if(mode==='once')   playOnce(id,s);
+  else if(mode==='loop')   playLoop(id,s);
+  else if(mode==='shadow') playShadow(id,s);
+}
+
+function playOnce(id,s){
   ttsUtter=new SpeechSynthesisUtterance(s.english);
-  ttsUtter.lang='en-US';ttsUtter.rate=0.85;
-  ttsUtter.onstart=()=>{ if(btn) btn.textContent='⏹️'; };
-  ttsUtter.onend  =()=>{ ttsUtter=null; if(btn) btn.textContent='🔊'; };
+  ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+  ttsUtter.onend=()=>{ stopPlayback(); };
   speechSynthesis.speak(ttsUtter);
+}
+
+function playLoop(id,s){
+  function doLoop(){
+    if(playId!==id||playMode!=='loop') return;
+    ttsUtter=new SpeechSynthesisUtterance(s.english);
+    ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+    ttsUtter.onend=()=>{
+      if(playId===id&&playMode==='loop')
+        shadowTimer=setTimeout(doLoop,400);
+    };
+    speechSynthesis.speak(ttsUtter);
+  }
+  doLoop();
+}
+
+function playShadow(id,s){
+  function doShadow(){
+    if(playId!==id||playMode!=='shadow') return;
+    let t0=null;
+    ttsUtter=new SpeechSynthesisUtterance(s.english);
+    ttsUtter.lang='en-US'; ttsUtter.rate=0.85;
+    ttsUtter.onstart=()=>{ t0=Date.now(); };
+    ttsUtter.onend=()=>{
+      if(playId!==id||playMode!=='shadow') return;
+      const spoken=t0?Date.now()-t0:2000;
+      const pause=Math.max(spoken,1200); // 停頓時間 = 朗讀時間（最少 1.2 秒）
+      shadowTimer=setTimeout(doShadow, pause);
+    };
+    speechSynthesis.speak(ttsUtter);
+  }
+  doShadow();
 }
 
 async function toggleRec(id){
@@ -649,12 +740,79 @@ function renderHistory(){
         <div class="s-num">第 ${i+1} 句</div>
         <div class="zh">🇹🇼&ensp;${esc(s.chinese)}</div>
         <div class="en">🇺🇸&ensp;${wordify(s.english)}</div>
-        <div class="acts"><button class="icon-btn" data-speak="${s.id}" title="播放">🔊</button></div>
+        <div class="acts play-grp">
+          <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">▶ 一次</button>
+          <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
+          <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習">🎧 跟讀</button>
+        </div>
       </div>`).join('')}
     </div>`;
   }).join('');
 }
 function toggleHist(d){ $(`hd-${d}`)?.classList.toggle('open'); }
+
+function highlight(text, q){
+  if(!q) return esc(text);
+  const safe = q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return esc(text).replace(new RegExp(safe,'gi'),
+    m=>`<mark style="background:rgba(183,78,145,.35);color:#fff;border-radius:2px;padding:0 2px">${m}</mark>`);
+}
+
+function filterHistory(query){
+  const q = query.trim().toLowerCase();
+  const dates = Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  const countEl = $('search-count');
+
+  if(!dates.length){
+    $('hist-list').innerHTML='<div class="empty">📭<br>還沒有學習紀錄</div>';
+    countEl.textContent=''; return;
+  }
+
+  if(!q){
+    renderHistory(); countEl.textContent=''; return;
+  }
+
+  let totalMatches = 0;
+  let html = '';
+
+  dates.forEach(d=>{
+    const ss = sessions[d];
+    const matched = ss.filter(s=>
+      s.chinese.toLowerCase().includes(q) ||
+      s.english.toLowerCase().includes(q)
+    );
+    if(!matched.length) return;
+    totalMatches += matched.length;
+    ss.forEach(s=>sMap[s.id]=s);
+
+    html += `
+    <button class="hist-btn" onclick="toggleHist('search-${d}')">
+      <span>📅&ensp;${d}</span>
+      <span class="badge">${matched.length} 筆符合</span>
+    </button>
+    <div class="hist-detail open" id="hd-search-${d}">
+      ${matched.map((s,i)=>`
+      <div class="s-card">
+        <div class="s-num">${d}</div>
+        <div class="zh">🇹🇼&ensp;${highlight(s.chinese,q)}</div>
+        <div class="en">🇺🇸&ensp;${highlight(s.english,q)}</div>
+        <div class="acts play-grp">
+          <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">▶ 一次</button>
+          <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
+          <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習">🎧 跟讀</button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  });
+
+  if(!html){
+    $('hist-list').innerHTML=`<div class="empty">🔍<br>找不到含有「${esc(query)}」的句子</div>`;
+    countEl.textContent='';
+  } else {
+    $('hist-list').innerHTML = html;
+    countEl.textContent = `共 ${totalMatches} 筆`;
+  }
+}
 
 function renderPracticeOpts(){
   const dates=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
@@ -674,7 +832,7 @@ function startPractice(){
       <input type="text" placeholder="試著翻譯成英文…" style="margin-top:10px">
       <div class="acts" style="margin-top:9px">
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">👁️&ensp;顯示答案</button>
-        <button class="icon-btn" data-speak="${s.id}" title="聽正確發音">🔊</button>
+        <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="聽正確發音">▶ 播放</button>
       </div>
       <div class="answer">✅&ensp;${esc(s.english)}</div>
     </div>`).join('');
