@@ -499,7 +499,23 @@ input[type=range]::-moz-range-thumb{
       <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="hideModal('cfg-modal')">取消</button>
     </div>
 
-    <!-- 備份與同步 -->
+    <!-- GitHub Gist 雲端同步 -->
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <div class="lbl" style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">GitHub 雲端同步（推薦）</div>
+      <p style="font-size:.76rem;color:var(--text3);margin:0 0 10px;line-height:1.6">輸入 GitHub Token，所有裝置自動共用學習資料，不需手動傳檔。</p>
+      <label class="lbl" style="margin-bottom:5px">GitHub Personal Access Token</label>
+      <input type="password" id="cfg-gist-pat" class="mb3" placeholder="ghp_xxxx… （只需要 gist 權限）">
+      <p style="font-size:.74rem;color:var(--text3);margin:-4px 0 10px;line-height:1.65">
+        沒有 Token？請到
+        <a href="https://github.com/settings/tokens/new?scopes=gist&description=EnglishLearningApp" target="_blank"
+           style="color:var(--g2);border-bottom:1px dotted rgba(183,78,145,.4)">GitHub → 建立 Token（點此）</a>，
+        只勾選 <strong>gist</strong> 範圍即可。
+      </p>
+      <div id="gist-status" style="font-size:.78rem;min-height:1.3em;margin-bottom:8px;color:var(--g2)"></div>
+      <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="gistSync()">啟用 / 立即同步</button>
+    </div>
+
+    <!-- 手動備份（備用方案） -->
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
       <div class="lbl" style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">資料備份與同步</div>
       <p style="font-size:.76rem;color:var(--text3);margin:0 0 12px;line-height:1.6">學習記錄只存在瀏覽器本機。換裝置前，請先備份資料，再到新裝置匯入。</p>
@@ -708,6 +724,7 @@ function init(){
   }
   updateCnt();
   applyIcons();
+  gistPull(true); // background sync on startup
 }
 
 function updateCnt(){
@@ -726,6 +743,11 @@ function setupKey(){
 
 function openSettings(){
   $('cfg-key').value = localStorage.getItem('anthropic_key')||'';
+  $('cfg-gist-pat').value = localStorage.getItem('github_pat')||'';
+  const lastSync = localStorage.getItem('gist_last_push');
+  $('gist-status').textContent = lastSync
+    ? '上次同步：'+new Date(lastSync).toLocaleString('zh-TW')
+    : localStorage.getItem('github_pat') ? '尚未同步' : '';
   $('tts-vol').value = ttsVolume;
   $('tts-vol-pct').textContent = Math.round(ttsVolume*100)+'%';
   $('rec-vol').value = recVolume;
@@ -797,6 +819,119 @@ function importBackup(){
   if(data.eng_highlights) localStorage.setItem('eng_highlights', JSON.stringify(data.eng_highlights));
   alert('匯入成功！即將重新整理頁面');
   location.reload();
+}
+
+// ── GitHub Gist 雲端同步 ──────────────────────────────────────────
+const GIST_FILE='english-learning-data.json';
+
+function _gistHeaders(pat){
+  return {'Authorization':'token '+pat,'Content-Type':'application/json','Accept':'application/vnd.github+json'};
+}
+function _localBundle(){
+  return {
+    eng_sessions:   JSON.parse(localStorage.getItem('eng_sessions')||'{}'),
+    eng_highlights: JSON.parse(localStorage.getItem('eng_highlights')||'{}'),
+    updated_at:     new Date().toISOString(),
+  };
+}
+function _mergeBundle(local, remote){
+  const s={...local.eng_sessions};
+  for(const [d,arr] of Object.entries(remote.eng_sessions||{})){
+    if(!s[d]||arr.length>s[d].length) s[d]=arr;
+  }
+  return {
+    eng_sessions:   s,
+    eng_highlights: {...(remote.eng_highlights||{}),...(local.eng_highlights||{})},
+  };
+}
+
+function _gistShowStatus(msg,err){
+  const el=$('gist-status'); if(!el) return;
+  el.textContent=msg; el.style.color=err?'#f87171':'var(--g2)';
+}
+
+async function _gistFindOrCreate(pat){
+  let gistId=localStorage.getItem('gist_id');
+  if(gistId) return gistId;
+  // Search existing gists for our file
+  const res=await fetch('https://api.github.com/gists?per_page=100',{headers:_gistHeaders(pat)});
+  if(!res.ok) throw new Error('無法連線 GitHub（'+res.status+'），請確認 Token 是否正確');
+  const list=await res.json();
+  const found=list.find(g=>g.files[GIST_FILE]);
+  if(found){ localStorage.setItem('gist_id',found.id); return found.id; }
+  // Create new gist
+  const cr=await fetch('https://api.github.com/gists',{
+    method:'POST', headers:_gistHeaders(pat),
+    body:JSON.stringify({description:'English Learning App Data',public:false,
+      files:{[GIST_FILE]:{content:JSON.stringify(_localBundle(),null,2)}}})
+  });
+  if(!cr.ok) throw new Error('建立 Gist 失敗（'+cr.status+'）');
+  const gist=await cr.json();
+  localStorage.setItem('gist_id',gist.id);
+  return gist.id;
+}
+
+async function gistPush(silent){
+  const pat=localStorage.getItem('github_pat'); if(!pat) return;
+  try{
+    const gistId=await _gistFindOrCreate(pat);
+    const res=await fetch('https://api.github.com/gists/'+gistId,{
+      method:'PATCH', headers:_gistHeaders(pat),
+      body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(_localBundle(),null,2)}}})
+    });
+    if(!res.ok) throw new Error('上傳失敗（'+res.status+'）');
+    const ts=new Date().toISOString();
+    localStorage.setItem('gist_last_push',ts);
+    if(!silent) _gistShowStatus('✓ 已同步到雲端');
+  }catch(e){
+    if(!silent) _gistShowStatus(e.message,true);
+  }
+}
+
+async function gistPull(silent){
+  const pat=localStorage.getItem('github_pat'); if(!pat) return;
+  try{
+    const gistId=await _gistFindOrCreate(pat);
+    const res=await fetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders(pat)});
+    if(!res.ok) throw new Error('拉取失敗（'+res.status+'）');
+    const gist=await res.json();
+    const content=gist.files[GIST_FILE]?.content; if(!content) return;
+    const remote=JSON.parse(content);
+    const merged=_mergeBundle(_localBundle(),remote);
+    const newS=JSON.stringify(merged.eng_sessions);
+    const newH=JSON.stringify(merged.eng_highlights);
+    const changed=newS!==localStorage.getItem('eng_sessions')||newH!==localStorage.getItem('eng_highlights');
+    if(changed){
+      localStorage.setItem('eng_sessions',newS);
+      localStorage.setItem('eng_highlights',newH);
+      localStorage.setItem('gist_last_push',new Date().toISOString());
+      if(silent){ location.reload(); return; }
+      _gistShowStatus('✓ 已從雲端更新資料');
+    } else {
+      if(!silent) _gistShowStatus('✓ 資料已是最新');
+    }
+  }catch(e){
+    if(!silent) _gistShowStatus(e.message,true);
+  }
+}
+
+async function gistSync(){
+  const pat=($('cfg-gist-pat')?.value||'').trim()||localStorage.getItem('github_pat')||'';
+  if(!pat){ _gistShowStatus('請輸入 GitHub Token',true); return; }
+  localStorage.setItem('github_pat',pat);
+  // Clear cached gist_id to re-search if PAT changed
+  if(pat!==localStorage.getItem('github_pat')) localStorage.removeItem('gist_id');
+  _gistShowStatus('同步中…');
+  await gistPull(false);
+  await gistPush(false);
+  const ts=localStorage.getItem('gist_last_push');
+  _gistShowStatus('✓ 同步完成！'+(ts?' 上次：'+new Date(ts).toLocaleString('zh-TW'):''));
+}
+
+let _gistPushTimer=null;
+function gistPushDebounced(){
+  clearTimeout(_gistPushTimer);
+  _gistPushTimer=setTimeout(()=>gistPush(true),4000);
 }
 
 async function doTranslate(){
@@ -900,7 +1035,7 @@ function notesPanelHTML(id){
 }
 
 // ── highlight & notes ─────────────────────────────────────────
-function saveHighlights(){ localStorage.setItem('eng_highlights',JSON.stringify(highlights)); }
+function saveHighlights(){ localStorage.setItem('eng_highlights',JSON.stringify(highlights)); gistPushDebounced(); }
 
 function toggleHighlight(id){
   const s=sMap[id]; if(!s) return;
@@ -1263,6 +1398,7 @@ function saveSession(){
   const orig=btn.innerHTML;
   btn.innerHTML='✅&ensp;已儲存！';
   setTimeout(()=>{ btn.innerHTML=orig; },2000);
+  gistPush(true);
 }
 
 function clearToday(){
