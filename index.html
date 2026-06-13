@@ -674,6 +674,9 @@ let shadowTimer = null;
 let ttsVolume  = parseFloat(localStorage.getItem('tts_vol') || '0.9');
 let recVolume  = parseFloat(localStorage.getItem('rec_vol') || '0.5');
 let highlights = JSON.parse(localStorage.getItem('eng_highlights') || '{}');
+let playAllList = [];
+let playAllIdx  = 0;
+let playAllLoop = false;
 
 const $   = id => document.getElementById(id);
 const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1213,10 +1216,41 @@ const SVG = {
 };
 const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
+function playAll(dateKey, loop){
+  const ss=sessions[dateKey]; if(!ss||!ss.length) return;
+  stopPlayback();
+  ss.forEach(s=>sMap[s.id]=s);
+  playAllList=ss.map(s=>s.id);
+  playAllIdx=0;
+  playAllLoop=loop;
+  playMode=loop?'all-loop':'all-once';
+  _playAllNext();
+}
+
+function _playAllNext(){
+  if(playAllIdx>=playAllList.length){
+    if(playAllLoop){ playAllIdx=0; }
+    else{ stopPlayback(); return; }
+  }
+  const id=playAllList[playAllIdx];
+  const s=sMap[id];
+  if(!s){ playAllIdx++; _playAllNext(); return; }
+  playId=id;
+  showNowPlaying(id,playMode);
+  ttsUtter=mkUtter(s.english);
+  ttsUtter.onend=()=>{
+    if(playMode!=='all-once'&&playMode!=='all-loop') return;
+    playAllIdx++;
+    shadowTimer=setTimeout(_playAllNext,500);
+  };
+  speechSynthesis.speak(ttsUtter);
+}
+
 function stopPlayback(){
   speechSynthesis.cancel();
   if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
   ttsUtter=null;
+  playAllList=[]; playAllIdx=0; playAllLoop=false;
   if(playId){
     document.querySelectorAll(`.play-btn[data-pid="${playId}"]`).forEach(b=>{
       b.innerHTML=PLAY_LABELS[b.dataset.play]||SVG.play;
@@ -1238,9 +1272,9 @@ function showNowPlaying(id, mode){
       if(i>=0){ num=i+1; break; }
     }
   }
-  const modeLabel={once:SVG.play+' 播放',loop:SVG.repeat+' 循環',shadow:SVG.headphones+' 跟讀'}[mode]||mode;
+  const modeLabel={once:SVG.play+' 播放',loop:SVG.repeat+' 循環',shadow:SVG.headphones+' 跟讀','all-once':SVG.play+' 全部','all-loop':SVG.repeat+' 全部循環'}[mode]||mode;
   $('np-mode').innerHTML=modeLabel;
-  $('np-num').textContent=`第 ${num} 句`;
+  $('np-num').textContent = playAllList.length>1 ? `${playAllIdx+1} / ${playAllList.length}` : `第 ${num} 句`;
   $('np-zh').textContent=s.chinese;
   $('now-playing').style.display='flex';
   requestAnimationFrame(()=>{
@@ -1437,7 +1471,11 @@ function renderHistory(){
     return `
     <button class="hist-btn" onclick="toggleHist('${d}')">
       <span>${SVG.calDays}&ensp;${d}</span>
-      <span class="badge">${ss.length} 句</span>
+      <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',false)" title="依序朗讀這天所有句子">${SVG.play}&ensp;播放全部</button>
+        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',true)" title="循環播放這天所有句子">${SVG.repeat}&ensp;循環</button>
+        <span class="badge">${ss.length} 句</span>
+      </div>
     </button>
     <div class="hist-detail" id="hd-${d}">
       ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
