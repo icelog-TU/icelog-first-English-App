@@ -378,6 +378,7 @@ select option{background:var(--bg2);color:var(--text)}
   box-shadow:0 0 0 2px rgba(183,78,145,.28), 0 0 24px rgba(183,78,145,.48);
 }
 .play-btn.p-dim{opacity:.28;box-shadow:none!important}
+.play-btn svg{display:inline-block;vertical-align:-2px;flex-shrink:0}
 
 /* ── header brand hover ── */
 .header-brand{cursor:pointer;transition:opacity .2s}
@@ -725,9 +726,9 @@ function cardHTML(s,i,opts){
     <div class="en">🇺🇸&ensp;${wordify(s.english)}</div>
     <div class="acts">
       <div class="play-grp">
-        <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">▶ 一次</button>
-        <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">🔁 循環</button>
-        <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">🎧 跟讀</button>
+        <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">${SVG.play} 一次</button>
+        <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">${SVG.repeat} 循環</button>
+        <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">${SVG.headphones} 跟讀</button>
       </div>
       ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">🎤</button><span id="rp-${s.id}"></span>`:''}
     </div>
@@ -896,7 +897,13 @@ document.addEventListener('click', e=>{
 });
 
 // ── playback labels / icons ──────────────────────────
-const PLAY_LABELS = {once:'▶ 一次', loop:'🔁 循環', shadow:'🎧 跟讀'};
+const SVG = {
+  play:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
+  repeat:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`,
+  headphones:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>`,
+  pause:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/></svg>`,
+};
+const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
 function stopPlayback(){
   speechSynthesis.cancel();
@@ -904,7 +911,7 @@ function stopPlayback(){
   ttsUtter=null;
   if(playId){
     document.querySelectorAll(`.play-btn[data-pid="${playId}"]`).forEach(b=>{
-      b.textContent=PLAY_LABELS[b.dataset.play]||'▶';
+      b.innerHTML=PLAY_LABELS[b.dataset.play]||SVG.play;
       b.classList.remove('p-active','p-dim');
     });
   }
@@ -957,10 +964,10 @@ function scrollToPlaying(){
 function setPlayUI(id, activeMode){
   document.querySelectorAll(`.play-btn[data-pid="${id}"]`).forEach(b=>{
     if(b.dataset.play===activeMode){
-      b.textContent='⏹ 停止';
+      b.innerHTML=SVG.pause+' 停止';
       b.classList.add('p-active'); b.classList.remove('p-dim');
     } else {
-      b.textContent=PLAY_LABELS[b.dataset.play]||'▶';
+      b.innerHTML=PLAY_LABELS[b.dataset.play]||SVG.play;
       b.classList.add('p-dim'); b.classList.remove('p-active');
     }
   });
@@ -1204,7 +1211,7 @@ function startPractice(){
       <div class="acts" style="margin-top:9px">
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">👁️&ensp;顯示答案</button>
         <button class="btn btn-solid btn-sm ai-check-btn" onclick="aiCheck('${s.id}',this)">🤖&ensp;AI 批改</button>
-        <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="聽正確發音">▶ 播放</button>
+        <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="聽正確發音">${SVG.play} 播放</button>
       </div>
       <div class="answer">✅&ensp;${esc(s.english)}</div>
       <div class="ai-fb" id="ai-fb-${s.id}"></div>
