@@ -379,6 +379,7 @@ select option{background:var(--bg2);color:var(--text)}
 }
 .play-btn.p-dim{opacity:.28;box-shadow:none!important}
 .play-btn svg{display:inline-block;vertical-align:-2px;flex-shrink:0}
+.si{display:inline-block;vertical-align:-.15em;flex-shrink:0}
 
 /* ── header brand hover ── */
 .header-brand{cursor:pointer;transition:opacity .2s}
@@ -607,6 +608,43 @@ const $   = id => document.getElementById(id);
 const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const today = () => new Date().toISOString().slice(0,10);
 
+function applyIcons(){
+  // Tabs
+  const tabDefs=[
+    [SVG.notebookPen,'今日學習'],[SVG.history,'歷史紀錄'],
+    [SVG.pencil,'練習模式'],[SVG.star,'重點筆記'],
+  ];
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    if(tabDefs[i]) t.innerHTML=tabDefs[i][0]+'&ensp;'+tabDefs[i][1];
+  });
+  // Header settings button
+  const settBtn=document.querySelector('button[onclick="openSettings()"]');
+  if(settBtn) settBtn.innerHTML=SVG.settings;
+  // Action buttons (today page)
+  const tb=$('trans-btn');
+  if(tb) tb.innerHTML=`<span>${SVG.languages}</span>&ensp;翻譯`;
+  const sb=$('save-btn');
+  if(sb) sb.innerHTML=`<span>${SVG.save}</span>&ensp;儲存今日`;
+  const cb=document.querySelector('[onclick="clearToday()"]');
+  if(cb) cb.innerHTML=`<span>${SVG.trash}</span>&ensp;清除`;
+  // Now-playing bar
+  const locBtn=document.querySelector('.np-btn:not(.stop)');
+  if(locBtn) locBtn.innerHTML=SVG.mapPin+'&ensp;定位';
+  const stopBtn=document.querySelector('.np-btn.stop');
+  if(stopBtn) stopBtn.innerHTML=SVG.pause+'&ensp;停止';
+  // Dictionary popup close button
+  const dictClose=document.querySelector('#dict button[onclick="closeDict()"]');
+  if(dictClose) dictClose.innerHTML=SVG.xClose;
+  // Dictionary popup title icon
+  const dictWord=$('dict-word');
+  if(dictWord && !dictWord.previousElementSibling?.classList?.contains('dict-icon')){
+    const icon=document.createElement('span');
+    icon.className='dict-icon';
+    icon.innerHTML=SVG.bookA+'&ensp;';
+    dictWord.parentNode.insertBefore(icon,dictWord);
+  }
+}
+
 function init(){
   if(!localStorage.getItem('anthropic_key')) $('setup-modal').classList.remove('hide');
   const d = new Date();
@@ -620,6 +658,7 @@ function init(){
     renderResults(todayData, 'results');
   }
   updateCnt();
+  applyIcons();
 }
 
 function updateCnt(){
@@ -692,7 +731,7 @@ async function doTranslate(){
   }catch(err){
     alert('翻譯失敗：'+err.message);
   }finally{
-    btn.innerHTML='<span>🔄</span>&ensp;翻譯';btn.disabled=false;
+    btn.innerHTML=`<span>${SVG.languages}</span>&ensp;翻譯`;btn.disabled=false;
   }
 }
 
@@ -730,7 +769,7 @@ function cardHTML(s,i,opts){
         <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">${SVG.repeat} 循環</button>
         <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">${SVG.headphones} 跟讀</button>
       </div>
-      ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">🎤</button><span id="rp-${s.id}"></span>`:''}
+      ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}"></span>`:''}
     </div>
     ${hl?notesPanelHTML(s.id):''}
   </div>`;
@@ -751,7 +790,7 @@ function notesPanelHTML(id){
       placeholder="輸入你的想法、疑問…&#10;例如：這個用法跟我想的哪裡不同？跟哪個句子類似？"
       onblur="saveNote('${id}',this.value)">${esc(note)}</textarea>
     <div style="margin-top:8px">
-      <button class="btn btn-ghost btn-sm" onclick="toggleAIChat('${id}')">🤖 與 AI 討論</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAIChat('${id}')">${SVG.bot}&ensp;與 AI 討論</button>
     </div>
     <div class="chat-wrap${chatOpen?' open':''}" id="aichat-${id}">
       <div class="chat-msgs" id="chat-msgs-${id}">${msgs}</div>
@@ -897,11 +936,32 @@ document.addEventListener('click', e=>{
 });
 
 // ── playback labels / icons ──────────────────────────
+// helper: wrap paths in a sized SVG (for play buttons – fixed px)
+const _s=(w,h,d)=>`<svg width="${w}" height="${h}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+// helper: wrap paths in a scalable SVG (for text buttons – scales with font)
+const _i=d=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+
 const SVG = {
-  play:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
-  repeat:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`,
-  headphones:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>`,
-  pause:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/></svg>`,
+  // ── play-button icons (fixed size) ──
+  play:       _s(13,13,`<polygon points="6 3 20 12 6 21 6 3"/>`),
+  repeat:     _s(13,13,`<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>`),
+  headphones: _s(14,14,`<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>`),
+  pause:      _s(14,14,`<circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/>`),
+  // ── UI icons (scalable) ──
+  mic:        _i(`<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>`),
+  trash:      _i(`<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`),
+  save:       _i(`<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>`),
+  languages:  _i(`<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>`),
+  notebookPen:_i(`<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>`),
+  history:    _i(`<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>`),
+  pencil:     _i(`<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>`),
+  star:       _i(`<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>`),
+  settings:   _i(`<path d="M14 17H5"/><path d="M19 7h-9"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>`),
+  mapPin:     _i(`<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>`),
+  eye:        _i(`<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>`),
+  bot:        _i(`<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>`),
+  bookA:      _i(`<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="m8 13 4-7 4 7"/><path d="M9.1 11h5.7"/>`),
+  xClose:     _i(`<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`),
 };
 const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
@@ -1042,12 +1102,12 @@ async function toggleRec(id){
       const rp=$(`rp-${id}`);
       if(rp) rp.innerHTML=`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${id}')">播放錄音</button></span>`;
       const rb=$(`rb-${id}`);
-      if(rb){rb.classList.remove('rec-on');rb.textContent='🎤';}
+      if(rb){rb.classList.remove('rec-on');rb.innerHTML=SVG.mic;}
       stream.getTracks().forEach(t=>t.stop());recFor=null;
     };
     recorder.start();
     const rb=$(`rb-${id}`);
-    if(rb){rb.classList.add('rec-on');rb.textContent='⏹️';}
+    if(rb){rb.classList.add('rec-on');rb.innerHTML=SVG.pause;}
   }catch{
     alert('無法存取麥克風，請確認瀏覽器已允許麥克風權限。');
   }
@@ -1209,8 +1269,8 @@ function startPractice(){
         style="margin-top:10px"
         onkeydown="if(event.key==='Enter')aiCheck('${s.id}',this.parentElement.querySelector('.ai-check-btn'))">
       <div class="acts" style="margin-top:9px">
-        <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">👁️&ensp;顯示答案</button>
-        <button class="btn btn-solid btn-sm ai-check-btn" onclick="aiCheck('${s.id}',this)">🤖&ensp;AI 批改</button>
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">${SVG.eye}&ensp;顯示答案</button>
+        <button class="btn btn-solid btn-sm ai-check-btn" onclick="aiCheck('${s.id}',this)">${SVG.bot}&ensp;AI 批改</button>
         <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="聽正確發音">${SVG.play} 播放</button>
       </div>
       <div class="answer">✅&ensp;${esc(s.english)}</div>
