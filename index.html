@@ -917,13 +917,17 @@ function showNowPlaying(id, mode){
   $('np-num').textContent=`第 ${num} 句`;
   $('np-zh').textContent=s.chinese;
   $('now-playing').style.display='flex';
-  // Add bottom padding so content isn't hidden behind bar
-  document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom='70px');
+  requestAnimationFrame(()=>{
+    const barH=$('now-playing').offsetHeight;
+    document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom=(barH+10)+'px');
+    $('dict').style.bottom=(18+barH)+'px';
+  });
 }
 
 function hideNowPlaying(){
   $('now-playing').style.display='none';
   document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom='');
+  $('dict').style.bottom='';
 }
 
 function scrollToPlaying(){
@@ -1039,6 +1043,10 @@ async function lookupWord(word){
   $('dict-word').textContent=word;
   $('dict-body').innerHTML='<p style="font-size:.82rem;color:var(--text3)">查詢中…</p>';
   $('dict').classList.add('show');
+  // If now-playing bar is visible, keep dict above it
+  if($('now-playing').style.display==='flex'){
+    $('dict').style.bottom=(18+$('now-playing').offsetHeight)+'px';
+  }
   try{
     const r=await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
     if(!r.ok) throw new Error('查無此字');
