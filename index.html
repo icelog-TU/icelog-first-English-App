@@ -1471,13 +1471,13 @@ function renderHistory(){
     return `
     <button class="hist-btn" onclick="toggleHist('${d}')">
       <span>${SVG.calDays}&ensp;${d}</span>
-      <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
-        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',false)" title="依序朗讀這天所有句子">${SVG.play}&ensp;播放全部</button>
-        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',true)" title="循環播放這天所有句子">${SVG.repeat}&ensp;循環</button>
-        <span class="badge">${ss.length} 句</span>
-      </div>
+      <span class="badge">${ss.length} 句</span>
     </button>
     <div class="hist-detail" id="hd-${d}">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',false)">${SVG.play}&ensp;播放全部</button>
+        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',true)">${SVG.repeat}&ensp;循環播放</button>
+      </div>
       ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
     </div>`;
   }).join('');
