@@ -650,6 +650,23 @@ function applyIcons(){
     icon.innerHTML=SVG.bookA+'&ensp;';
     dictWord.parentNode.insertBefore(icon,dictWord);
   }
+  // History search box: inject SVG icon, update placeholder
+  const searchInput=$('hist-search');
+  if(searchInput && !searchInput.previousElementSibling?.classList?.contains('srch-icon')){
+    searchInput.placeholder='搜尋句子關鍵字（中文或英文）…';
+    searchInput.style.paddingLeft='38px';
+    const sicon=document.createElement('span');
+    sicon.className='srch-icon';
+    sicon.style.cssText='position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;line-height:0';
+    sicon.innerHTML=SVG.search;
+    searchInput.parentNode.insertBefore(sicon,searchInput);
+  }
+  // Practice start button
+  const pracBtn=document.querySelector('[onclick="startPractice()"]');
+  if(pracBtn) pracBtn.innerHTML=SVG.dumbbell+'&ensp;開始練習';
+  // Notes page section title
+  const notesTitle=document.querySelector('#page-notes .sec-title');
+  if(notesTitle) notesTitle.innerHTML=SVG.star+'&ensp;重點筆記';
 }
 
 function init(){
@@ -903,7 +920,7 @@ async function sendAI(id){
 function renderNotes(){
   const ids=Object.keys(highlights);
   if(!ids.length){
-    $('notes-list').innerHTML=`<div class="empty">⭐<br>還沒有標記任何重點<br><span style="font-size:.82rem">點句子右上角的 ⭐ 按鈕來標記重點句子</span></div>`;
+    $('notes-list').innerHTML=`<div class="empty">${SVG.star}<br>還沒有標記任何重點<br><span style="font-size:.82rem">點句子右上角的星星按鈕來標記重點句子</span></div>`;
     return;
   }
   // Group by date, newest first
@@ -918,14 +935,14 @@ function renderNotes(){
     const items=byDate[d];
     return `
     <button class="hist-btn" onclick="toggleHist('notes-${d}')">
-      <span>📅&ensp;${d}</span>
+      <span>${SVG.calDays}&ensp;${d}</span>
       <span class="badge">${items.length} 個重點</span>
     </button>
     <div class="hist-detail open" id="hd-notes-${d}">
       ${items.map(h=>{
         sMap[h.id]={id:h.id,chinese:h.chinese,english:h.english};
         return cardHTML({id:h.id,chinese:h.chinese,english:h.english},0,
-          {numLabel:'⭐ 重點',showRec:false});
+          {numLabel:SVG.star+'&ensp;重點',showRec:false});
       }).join('')}
     </div>`;
   }).join('');
@@ -971,6 +988,9 @@ const SVG = {
   bot:        _i(`<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>`),
   bookA:      _i(`<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="m8 13 4-7 4 7"/><path d="M9.1 11h5.7"/>`),
   xClose:     _i(`<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`),
+  search:     _i(`<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>`),
+  calDays:    _i(`<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>`),
+  dumbbell:   _i(`<path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/>`),
 };
 const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
@@ -1000,8 +1020,8 @@ function showNowPlaying(id, mode){
       if(i>=0){ num=i+1; break; }
     }
   }
-  const modeLabel={once:'▶ 播放',loop:'🔁 循環',shadow:'🎧 跟讀'}[mode]||mode;
-  $('np-mode').textContent=modeLabel;
+  const modeLabel={once:SVG.play+' 播放',loop:SVG.repeat+' 循環',shadow:SVG.headphones+' 跟讀'}[mode]||mode;
+  $('np-mode').innerHTML=modeLabel;
   $('np-num').textContent=`第 ${num} 句`;
   $('np-zh').textContent=s.chinese;
   $('now-playing').style.display='flex';
@@ -1196,7 +1216,7 @@ function renderHistory(){
     const ss=sessions[d];ss.forEach(s=>sMap[s.id]=s);
     return `
     <button class="hist-btn" onclick="toggleHist('${d}')">
-      <span>📅&ensp;${d}</span>
+      <span>${SVG.calDays}&ensp;${d}</span>
       <span class="badge">${ss.length} 句</span>
     </button>
     <div class="hist-detail" id="hd-${d}">
@@ -1242,7 +1262,7 @@ function filterHistory(query){
 
     html += `
     <button class="hist-btn" onclick="toggleHist('search-${d}')">
-      <span>📅&ensp;${d}</span>
+      <span>${SVG.calDays}&ensp;${d}</span>
       <span class="badge">${matched.length} 筆符合</span>
     </button>
     <div class="hist-detail open" id="hd-search-${d}">
