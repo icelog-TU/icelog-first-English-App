@@ -471,6 +471,16 @@ input[type=range]::-moz-range-thumb{
   background:var(--g2);cursor:pointer;border:none;
 }
 
+/* ── session date picker ── */
+input[type=date]{
+  background:transparent;border:none;border-radius:0;
+  border-bottom:1px solid var(--border2);
+  color:var(--text);font-size:1rem;font-weight:300;font-family:inherit;
+  padding:3px 0;cursor:pointer;width:auto;box-shadow:none;
+}
+input[type=date]:focus{border-bottom-color:var(--g2);box-shadow:none}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45;cursor:pointer}
+
 /* ── alternative translations ── */
 .alts-wrap{margin-top:10px}
 .alt-card{
@@ -598,12 +608,17 @@ input[type=range]::-moz-range-thumb{
 <!-- TODAY -->
 <section class="page on" id="page-today">
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
       <div>
-        <div style="font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">今日日期</div>
-        <div style="font-weight:300;color:var(--text);font-size:1.05rem" id="today-date"></div>
+        <div style="font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">學習日期</div>
+        <input type="date" id="session-date" onchange="changeSessionDate(this.value)">
       </div>
       <span class="badge" id="cnt">0 句</span>
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="lbl">主題（選填）</label>
+      <input type="text" id="session-topic" placeholder="例如：小孩的傷心、神性排列、旅遊對話…"
+        style="border-bottom:1px solid var(--border2);border-top:none;border-left:none;border-right:none;border-radius:0;background:transparent;padding:6px 0">
     </div>
     <label class="lbl">輸入中文句子（每行一句，建議 10–20 句）</label>
     <textarea id="zh-in" placeholder="今天天氣真的很好。&#10;我想去公園散步。&#10;你有時間一起吃午飯嗎？" style="margin-bottom:4px"></textarea>
@@ -691,13 +706,14 @@ let shadowTimer = null;
 let ttsVolume  = parseFloat(localStorage.getItem('tts_vol') || '0.9');
 let recVolume  = parseFloat(localStorage.getItem('rec_vol') || '0.5');
 let highlights = JSON.parse(localStorage.getItem('eng_highlights') || '{}');
+let topics     = JSON.parse(localStorage.getItem('eng_topics') || '{}');
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllLoop = false;
 
 const $   = id => document.getElementById(id);
 const esc = s  => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const today = () => new Date().toISOString().slice(0,10);
+const today = () => new Date().toLocaleDateString('en-CA');
 
 function applyIcons(){
   // Tabs
@@ -755,8 +771,7 @@ function applyIcons(){
 
 function init(){
   if(!localStorage.getItem('anthropic_key')) $('setup-modal').classList.remove('hide');
-  const d = new Date();
-  $('today-date').textContent = d.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  $('session-date').value = today();
   $('zh-in').addEventListener('input', updateCnt);
   if(sessions[today()]){
     todayData = sessions[today()];
@@ -765,9 +780,28 @@ function init(){
     $('save-btn').disabled = false;
     renderResults(todayData, 'results');
   }
+  $('session-topic').value = topics[today()] || '';
   updateCnt();
   applyIcons();
-  gistPull(true); // background sync on startup
+  gistPull(true);
+}
+
+function changeSessionDate(date){
+  if(!date) return;
+  if(sessions[date]){
+    todayData = sessions[date];
+    todayData.forEach(s=>sMap[s.id]=s);
+    $('zh-in').value = todayData.map(s=>s.chinese).join('\n');
+    $('save-btn').disabled = false;
+    renderResults(todayData,'results');
+  } else {
+    todayData=[];
+    $('zh-in').value='';
+    $('results').innerHTML='';
+    $('save-btn').disabled = true;
+  }
+  $('session-topic').value = topics[date] || '';
+  updateCnt();
 }
 
 function updateCnt(){
@@ -821,6 +855,7 @@ function _backupData(){
   return JSON.stringify({
     eng_sessions:   JSON.parse(localStorage.getItem('eng_sessions')||'{}'),
     eng_highlights: JSON.parse(localStorage.getItem('eng_highlights')||'{}'),
+    eng_topics:     JSON.parse(localStorage.getItem('eng_topics')||'{}'),
   });
 }
 
@@ -860,6 +895,7 @@ function importBackup(){
   if(!confirm('確定要匯入？這會覆蓋這臺裝置目前的學習資料。')) return;
   if(data.eng_sessions)   localStorage.setItem('eng_sessions',   JSON.stringify(data.eng_sessions));
   if(data.eng_highlights) localStorage.setItem('eng_highlights', JSON.stringify(data.eng_highlights));
+  if(data.eng_topics)     localStorage.setItem('eng_topics',     JSON.stringify(data.eng_topics));
   alert('匯入成功！即將重新整理頁面');
   location.reload();
 }
@@ -874,6 +910,7 @@ function _localBundle(){
   return {
     eng_sessions:   JSON.parse(localStorage.getItem('eng_sessions')||'{}'),
     eng_highlights: JSON.parse(localStorage.getItem('eng_highlights')||'{}'),
+    eng_topics:     JSON.parse(localStorage.getItem('eng_topics')||'{}'),
     updated_at:     new Date().toISOString(),
   };
 }
@@ -885,6 +922,7 @@ function _mergeBundle(local, remote){
   return {
     eng_sessions:   s,
     eng_highlights: {...(remote.eng_highlights||{}),...(local.eng_highlights||{})},
+    eng_topics:     {...(remote.eng_topics||{}),...(local.eng_topics||{})},
   };
 }
 
@@ -941,10 +979,12 @@ async function gistPull(silent){
     const merged=_mergeBundle(_localBundle(),remote);
     const newS=JSON.stringify(merged.eng_sessions);
     const newH=JSON.stringify(merged.eng_highlights);
-    const changed=newS!==localStorage.getItem('eng_sessions')||newH!==localStorage.getItem('eng_highlights');
+    const newT=JSON.stringify(merged.eng_topics||{});
+    const changed=newS!==localStorage.getItem('eng_sessions')||newH!==localStorage.getItem('eng_highlights')||newT!==localStorage.getItem('eng_topics');
     if(changed){
       localStorage.setItem('eng_sessions',newS);
       localStorage.setItem('eng_highlights',newH);
+      localStorage.setItem('eng_topics',newT);
       localStorage.setItem('gist_last_push',new Date().toISOString());
       if(silent){ location.reload(); return; }
       _gistShowStatus('✓ 已從雲端更新資料');
@@ -1536,8 +1576,12 @@ function closeDict(){ $('dict').classList.remove('show'); }
 
 function saveSession(){
   if(!todayData.length) return;
-  sessions[today()]=todayData;
-  localStorage.setItem('eng_sessions',JSON.stringify(sessions));
+  const d = $('session-date').value || today();
+  const topic = ($('session-topic')?.value || '').trim();
+  sessions[d] = todayData;
+  localStorage.setItem('eng_sessions', JSON.stringify(sessions));
+  if(topic){ topics[d]=topic; } else { delete topics[d]; }
+  localStorage.setItem('eng_topics', JSON.stringify(topics));
   const btn=$('save-btn');
   const orig=btn.innerHTML;
   btn.innerHTML='✅&ensp;已儲存！';
@@ -1575,7 +1619,7 @@ function renderHistory(){
     const ss=sessions[d];ss.forEach(s=>sMap[s.id]=s);
     return `
     <button class="hist-btn" onclick="toggleHist('${d}')">
-      <span>${SVG.calDays}&ensp;${d}</span>
+      <span>${SVG.calDays}&ensp;${d}${topics[d]?`<span style="color:var(--text3);font-weight:300;font-size:.82rem;margin-left:8px">· ${topics[d]}</span>`:''}</span>
       <span class="badge">${ss.length} 句</span>
     </button>
     <div class="hist-detail" id="hd-${d}">
@@ -1648,7 +1692,7 @@ function filterHistory(query){
 function renderPracticeOpts(){
   const dates=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
   $('prac-sel').innerHTML='<option value="">── 選擇日期 ──</option>'+
-    dates.map(d=>`<option value="${d}">${d}（${sessions[d].length} 句）</option>`).join('');
+    dates.map(d=>`<option value="${d}">${d}${topics[d]?' · '+topics[d]:''}（${sessions[d].length} 句）</option>`).join('');
 }
 
 function startPractice(){
