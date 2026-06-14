@@ -470,6 +470,23 @@ input[type=range]::-moz-range-thumb{
   width:15px;height:15px;border-radius:50%;
   background:var(--g2);cursor:pointer;border:none;
 }
+
+/* ── alternative translations ── */
+.alts-wrap{margin-top:10px}
+.alt-card{
+  background:rgba(228,76,101,.04);
+  border:1px solid rgba(228,76,101,.2);
+  border-left:3px solid var(--g2);
+  border-radius:0 2px 2px 0;
+  padding:12px 16px;margin-bottom:8px;
+}
+.alt-label{
+  font-size:.6rem;font-weight:400;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--g2);
+}
+.add-alt-wrap{margin-top:10px}
+.alt-input-area{display:none;margin-top:6px}
+.alt-input-area.open{display:block}
 </style>
 </head>
 <body>
@@ -1025,7 +1042,48 @@ function cardHTML(s,i,opts){
       </div>
       ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}"></span>`:''}
     </div>
+    ${altsHTML(s)}
     ${hl?notesPanelHTML(s.id):''}
+  </div>`;
+}
+
+function altsHTML(s){
+  const alts=s.alts||[];
+  const sid=s.id;
+  const altsCards=alts.map((alt,i)=>{
+    sMap[alt.id]={id:alt.id,chinese:s.chinese,english:alt.text};
+    return `
+    <div class="alt-card" id="alt-card-${alt.id}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span class="alt-label">我的翻譯 ${alts.length>1?i+1:''}</span>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAlt('${sid}','${alt.id}')"
+          style="padding:2px 8px;font-size:.62rem;color:var(--text3)">✕ 刪除</button>
+      </div>
+      <div class="en"><span class="lang-tag" style="color:var(--g2)">MY</span>&ensp;${wordify(alt.text)}</div>
+      <div class="acts">
+        <div class="play-grp">
+          <button class="icon-btn play-btn" data-play="once"   data-pid="${alt.id}">${SVG.play} 一次</button>
+          <button class="icon-btn play-btn" data-play="loop"   data-pid="${alt.id}">${SVG.repeat} 循環</button>
+          <button class="icon-btn play-btn" data-play="shadow" data-pid="${alt.id}">${SVG.headphones} 跟讀</button>
+        </div>
+        <button class="icon-btn" data-rec="${alt.id}" id="rb-${alt.id}" title="錄音">${SVG.mic}</button>
+        <span id="rp-${alt.id}"></span>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="alts-wrap" id="alts-${sid}">${altsCards}</div>
+  <div class="add-alt-wrap">
+    <button class="btn btn-ghost btn-sm" id="add-alt-btn-${sid}" onclick="showAddAlt('${sid}')">${SVG.plus}&ensp;新增翻譯</button>
+    <div class="alt-input-area" id="alt-input-area-${sid}">
+      <textarea id="alt-ta-${sid}" placeholder="輸入你覺得更適合的英文翻譯… (Ctrl+Enter 確認)"
+        style="min-height:64px;margin-top:6px"
+        onkeydown="if(event.key==='Enter'&&event.ctrlKey){event.preventDefault();confirmAlt('${sid}')}"></textarea>
+      <div class="row" style="margin-top:6px">
+        <button class="btn btn-solid btn-sm" onclick="confirmAlt('${sid}')">${SVG.plus}&ensp;確認新增</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelAddAlt('${sid}')">取消</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1055,6 +1113,52 @@ function notesPanelHTML(id){
       </div>
     </div>
   </div>`;
+}
+
+// ── alternative translations ─────────────────────────────────
+function showAddAlt(sid){
+  const btn=document.getElementById('add-alt-btn-'+sid);
+  const area=document.getElementById('alt-input-area-'+sid);
+  if(btn) btn.style.display='none';
+  if(area){ area.classList.add('open'); area.querySelector('textarea')?.focus(); }
+}
+function cancelAddAlt(sid){
+  const btn=document.getElementById('add-alt-btn-'+sid);
+  const area=document.getElementById('alt-input-area-'+sid);
+  if(area){ area.classList.remove('open'); const ta=area.querySelector('textarea'); if(ta) ta.value=''; }
+  if(btn) btn.style.display='';
+}
+function _findSentence(sid){
+  let s=todayData.find(x=>x.id===sid);
+  if(s) return {s, save:()=>{ sessions[today()]=todayData; localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }};
+  for(const d of Object.keys(sessions)){
+    s=sessions[d].find(x=>x.id===sid);
+    if(s) return {s, save:()=>{ localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }};
+  }
+  return null;
+}
+function _rerenderActive(){
+  const active=document.querySelector('.page.on')?.id;
+  if(active==='page-today') renderResults(todayData,'results');
+  else if(active==='page-history') renderHistory();
+  else if(active==='page-notes') renderNotes();
+}
+function confirmAlt(sid){
+  const ta=document.getElementById('alt-ta-'+sid);
+  const text=(ta?.value||'').trim();
+  if(!text){ alert('請輸入翻譯內容'); return; }
+  const found=_findSentence(sid); if(!found) return;
+  if(!found.s.alts) found.s.alts=[];
+  found.s.alts.push({id:'alt_'+Date.now(), text});
+  found.save();
+  _rerenderActive();
+}
+function deleteAlt(sid, altId){
+  if(!confirm('確定刪除這個翻譯？')) return;
+  const found=_findSentence(sid); if(!found) return;
+  if(found.s.alts) found.s.alts=found.s.alts.filter(a=>a.id!==altId);
+  found.save();
+  _rerenderActive();
 }
 
 // ── highlight & notes ─────────────────────────────────────────
@@ -1213,6 +1317,7 @@ const SVG = {
   calDays:    _i(`<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>`),
   dumbbell:   _i(`<path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/>`),
   chevronsUp: _i(`<path d="m17 11-5-5-5 5"/><path d="m17 17-5-5-5 5"/>`),
+  plus:       _i(`<path d="M5 12h14"/><path d="M12 5v14"/>`),
 };
 const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
@@ -1580,16 +1685,23 @@ async function aiCheck(id, btn){
   fbEl.innerHTML='<span style="opacity:.5">AI 正在評估中…</span>';
   fbEl.classList.add('show');
   if(btn) btn.disabled=true;
-  const prompt=`你是一位友善的英文老師，請評估學習者的英文翻譯答案。
+  const alts=s.alts||[];
+  const altsRef=alts.length?'\n其他參考版本：\n'+alts.map((a,i)=>`  版本${i+2}：${a.text}`).join('\n'):'';
+  const prompt=`你是一位友善的英文老師，請評估學習者的英文翻譯是否正確表達了中文意思。
 
 原文中文：${s.chinese}
-標準英文翻譯：${s.english}
+參考翻譯：${s.english}${altsRef}
 學習者的答案：${userAns}
 
+評估原則：
+• 最重要的是：學習者的答案有沒有準確傳達中文的意思？
+• 不需要跟參考翻譯一模一樣，只要意思正確、英文自然就算對
+• 檢查有無語法錯誤或用詞不當
+
 請用繁體中文簡潔回答，格式如下：
-第一行：先給評分標籤（選一個）：✅ 正確 / ⚠️ 大致正確，可接受 / ❌ 需要修改
-然後：簡要說明差異或問題（1-3 行，如果完全正確就不用多說）
-最後：如有需要，用「建議：」開頭給出更好的說法`;
+第一行：評分標籤（選一個）：✅ 意思正確、表達自然 / ⚠️ 意思大致正確，有小問題 / ❌ 意思有偏差或語法錯誤
+然後：簡要說明（1-3 行，完全正確就少說）
+最後：如有需要，用「建議：」開頭給更好的說法`;
   try{
     const res=await fetch('https://api.openai.com/v1/chat/completions',{
       method:'POST',
