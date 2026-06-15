@@ -733,7 +733,7 @@ function applyIcons(){
   const tb=$('trans-btn');
   if(tb) tb.innerHTML=`<span>${SVG.languages}</span>&ensp;翻譯`;
   const sb=$('save-btn');
-  if(sb) sb.innerHTML=`<span>${SVG.save}</span>&ensp;儲存今日`;
+  if(sb) sb.innerHTML=`<span>${SVG.save}</span>&ensp;儲存`;
   const cb=document.querySelector('[onclick="clearToday()"]');
   if(cb) cb.innerHTML=`<span>${SVG.trash}</span>&ensp;清除`;
   // Now-playing bar
@@ -1678,14 +1678,14 @@ function renderHistory(){
       const tColor=topics[key]?'var(--text2)':'var(--text3)';
       return `
       <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px">
-        <button class="hist-btn" style="background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
+        <div class="hist-btn" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
           <span style="color:${tColor};font-size:.88rem">${tLabel}&ensp;<span class="badge" style="font-size:.58rem">${ss.length} 句</span></span>
           <div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
             <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
             <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
           </div>
-        </button>
+        </div>
         <div class="hist-detail" id="hd-${key}">
           ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
         </div>
