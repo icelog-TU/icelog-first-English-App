@@ -596,6 +596,16 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
         placeholder="把另一臺裝置「複製資料」的文字貼在這裡，再按匯入…"></textarea>
       <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="importBackup()">匯入資料</button>
     </div>
+
+    <!-- 錄音管理 -->
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <div class="lbl" style="margin-bottom:4px">錄音管理</div>
+      <p style="font-size:.76rem;color:var(--text3);margin:0 0 10px;line-height:1.6">錄音檔儲存在瀏覽器本機，佔用空間較大。練習完後可一鍵清除所有錄音，釋放空間。</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span id="rec-storage-info" style="font-size:.78rem;color:var(--text3)"></span>
+      </div>
+      <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--red);border-color:rgba(228,76,101,.3)" onclick="clearAllRecordings()">清除全部錄音</button>
+    </div>
   </div>
 </div>
 
@@ -720,7 +730,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
 let sessions  = JSON.parse(localStorage.getItem('eng_sessions') || '{}');
 let todayData = [];
 let sMap      = {};
-let recordings= {};
+let recordings = Object.assign({}, JSON.parse(localStorage.getItem('eng_recordings') || '{}'));
 let recorder  = null;
 let recFor    = null;
 let recChunks = [];
@@ -919,7 +929,20 @@ function openSettings(){
   $('tts-vol-pct').textContent = Math.round(ttsVolume*100)+'%';
   $('rec-vol').value = recVolume;
   $('rec-vol-pct').textContent = Math.round(recVolume*100)+'%';
+  const recCount = Object.keys(JSON.parse(localStorage.getItem('eng_recordings')||'{}')).length;
+  $('rec-storage-info').textContent = recCount ? `目前已儲存 ${recCount} 筆錄音` : '目前沒有已儲存的錄音';
   $('cfg-modal').classList.remove('hide');
+}
+
+function clearAllRecordings(){
+  const recCount = Object.keys(JSON.parse(localStorage.getItem('eng_recordings')||'{}')).length;
+  if(!recCount){ alert('目前沒有已儲存的錄音'); return; }
+  if(!confirm(`確定清除全部 ${recCount} 筆錄音？清除後無法復原。`)) return;
+  localStorage.removeItem('eng_recordings');
+  recordings = {};
+  document.querySelectorAll('.rec-chip').forEach(el => el.remove());
+  $('rec-storage-info').textContent = '目前沒有已儲存的錄音';
+  alert('已清除全部錄音 ✓');
 }
 
 function updateVol(type, val){
@@ -1171,7 +1194,7 @@ function cardHTML(s,i,opts){
         <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">${SVG.repeat} 循環</button>
         <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">${SVG.headphones} 跟讀</button>
       </div>
-      ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}"></span>`:''}
+      ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}">${recordings[s.id]?`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${s.id}')">播放錄音</button></span>`:''}</span>`:''}
     </div>
     ${altsHTML(s)}
     ${hl?notesPanelHTML(s.id):''}
@@ -1616,6 +1639,16 @@ async function toggleRec(id){
       const blob=new Blob(recChunks,{type:'audio/webm'});
       const url=URL.createObjectURL(blob);
       recordings[id]=url;
+      // Persist to localStorage as base64 so it survives page reload
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{
+          const saved=JSON.parse(localStorage.getItem('eng_recordings')||'{}');
+          saved[id]=reader.result;
+          localStorage.setItem('eng_recordings',JSON.stringify(saved));
+        }catch(e){/* localStorage full — skip */}
+      };
+      reader.readAsDataURL(blob);
       const rp=$(`rp-${id}`);
       if(rp) rp.innerHTML=`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${id}')">播放錄音</button></span>`;
       const rb=$(`rb-${id}`);
@@ -1779,7 +1812,7 @@ function renderHistory(){
             </div>
           </div>
           <div class="hist-detail" id="hd-${key}">
-            ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
+            ${ss.map((s,i)=>cardHTML(s,i,{showRec:true})).join('')}
           </div>
         </div>`;
       }).join('');
