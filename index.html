@@ -1681,7 +1681,7 @@ function renderHistory(){
       const tColor=topics[key]?'var(--text2)':'var(--text3)';
       return `
       <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px">
-        <div class="hist-btn" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
+        <div class="hist-btn" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
           <span style="color:${tColor};font-size:.88rem">${tLabel}&ensp;<span class="badge" style="font-size:.58rem">${ss.length} 句</span></span>
           <div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
             <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
