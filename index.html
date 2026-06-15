@@ -599,6 +599,19 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
   </div>
 </div>
 
+<!-- Save-choice modal -->
+<div class="overlay hide" id="save-choice-modal">
+  <div class="modal">
+    <h2>儲存<span class="grad-text">方式</span></h2>
+    <p id="save-choice-msg" style="margin:16px 0 22px;line-height:1.7"></p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-solid" style="justify-content:center;padding:13px" onclick="_saveChoiceOverwrite()">覆蓋現有主題</button>
+      <button class="btn btn-primary" style="justify-content:center;padding:13px" onclick="_saveChoiceNew()">另存為新主題</button>
+      <button class="btn btn-ghost" style="justify-content:center" onclick="hideModal('save-choice-modal')">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- Header -->
 <header>
   <div class="header-brand" onclick="location.reload()" title="重新整理頁面">
@@ -720,6 +733,8 @@ let recVolume  = parseFloat(localStorage.getItem('rec_vol') || '0.5');
 let highlights = JSON.parse(localStorage.getItem('eng_highlights') || '{}');
 let topics          = JSON.parse(localStorage.getItem('eng_topics') || '{}');
 let currentSessionKey = null; // null = new session; string = key of session being edited
+let freshTranslation  = false; // true after doTranslate(), reset when session loaded
+let _pendingSaveDate  = null;
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllLoop = false;
@@ -800,6 +815,7 @@ function init(){
   }
   updateCnt();
   applyIcons();
+  freshTranslation = false;
   gistPull(true);
 
   // ── restore last tab / practice / scroll ──
@@ -849,6 +865,7 @@ function changeSessionDate(date){
     $('save-btn').disabled=true;
     $('session-topic').value='';
   }
+  freshTranslation = false;
   updateCnt();
 }
 
@@ -862,6 +879,7 @@ function newTopic(){
   $('results').innerHTML='';
   $('session-topic').value='';
   $('save-btn').disabled=true;
+  freshTranslation = false;
   updateCnt();
 }
 
@@ -1111,6 +1129,7 @@ async function doTranslate(){
     todayData.forEach(s=>sMap[s.id]=s);
     renderResults(todayData,'results');
     $('save-btn').disabled = false;
+    freshTranslation = true;
   }catch(err){
     alert('翻譯失敗：'+err.message);
   }finally{
@@ -1650,13 +1669,41 @@ function closeDict(){ $('dict').classList.remove('show'); }
 function saveSession(){
   if(!todayData.length) return;
   const date = $('session-date').value || today();
+
+  if(currentSessionKey && freshTranslation){
+    // Freshly translated + existing session → ask user
+    _pendingSaveDate = date;
+    const existingTopic = topics[currentSessionKey];
+    $('save-choice-msg').textContent = existingTopic
+      ? `這個日期已有「${existingTopic}」的記錄，要覆蓋它，還是另開新主題儲存？`
+      : '這個日期已有學習記錄，要覆蓋它，還是另開新主題儲存？';
+    $('save-choice-modal').classList.remove('hide');
+    return;
+  }
+
+  _doSave(date, currentSessionKey || _nextKeyForDate(date));
+}
+
+function _saveChoiceOverwrite(){
+  hideModal('save-choice-modal');
+  _doSave(_pendingSaveDate, currentSessionKey);
+  _pendingSaveDate = null;
+}
+
+function _saveChoiceNew(){
+  hideModal('save-choice-modal');
+  _doSave(_pendingSaveDate, _nextKeyForDate(_pendingSaveDate));
+  _pendingSaveDate = null;
+}
+
+function _doSave(date, key){
   const topic = ($('session-topic')?.value || '').trim();
-  const key = currentSessionKey || _nextKeyForDate(date);
   currentSessionKey = key;
   sessions[key] = todayData;
   localStorage.setItem('eng_sessions', JSON.stringify(sessions));
   if(topic){ topics[key]=topic; } else { delete topics[key]; }
   localStorage.setItem('eng_topics', JSON.stringify(topics));
+  freshTranslation = false;
   const btn=$('save-btn');
   const orig=btn.innerHTML;
   btn.innerHTML='✅&ensp;已儲存！';
