@@ -624,7 +624,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
     <textarea id="zh-in" placeholder="今天天氣真的很好。&#10;我想去公園散步。&#10;你有時間一起吃午飯嗎？" style="margin-bottom:4px"></textarea>
     <div class="row">
       <button class="btn btn-solid" id="trans-btn" onclick="doTranslate()"><span>🔄</span>&ensp;翻譯</button>
-      <button class="btn btn-primary" id="save-btn" disabled onclick="saveSession()"><span>💾</span>&ensp;儲存今日</button>
+      <button class="btn btn-primary" id="save-btn" disabled onclick="saveSession()"><span>💾</span>&ensp;儲存</button>
+      <button class="btn btn-ghost" id="new-topic-btn" onclick="newTopic()" title="儲存完目前主題後，開始輸入下一個主題">${'+'}&ensp;新增主題</button>
       <button class="btn btn-ghost" onclick="clearToday()"><span>🗑️</span>&ensp;清除</button>
     </div>
   </div>
@@ -706,7 +707,8 @@ let shadowTimer = null;
 let ttsVolume  = parseFloat(localStorage.getItem('tts_vol') || '0.9');
 let recVolume  = parseFloat(localStorage.getItem('rec_vol') || '0.5');
 let highlights = JSON.parse(localStorage.getItem('eng_highlights') || '{}');
-let topics     = JSON.parse(localStorage.getItem('eng_topics') || '{}');
+let topics          = JSON.parse(localStorage.getItem('eng_topics') || '{}');
+let currentSessionKey = null; // null = new session; string = key of session being edited
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllLoop = false;
@@ -773,35 +775,76 @@ function init(){
   if(!localStorage.getItem('anthropic_key')) $('setup-modal').classList.remove('hide');
   $('session-date').value = today();
   $('zh-in').addEventListener('input', updateCnt);
-  if(sessions[today()]){
-    todayData = sessions[today()];
+  const initKey=_firstKeyForDate(today());
+  if(initKey){
+    currentSessionKey=initKey;
+    todayData = sessions[initKey];
     todayData.forEach(s => sMap[s.id] = s);
     $('zh-in').value = todayData.map(s=>s.chinese).join('\n');
     $('save-btn').disabled = false;
     renderResults(todayData, 'results');
+    $('session-topic').value = topics[initKey] || '';
   }
-  $('session-topic').value = topics[today()] || '';
   updateCnt();
   applyIcons();
   gistPull(true);
 }
 
+function _firstKeyForDate(date){
+  if(sessions[date]) return date;
+  for(let n=2;n<=99;n++){ const k=`${date}_${n}`; if(sessions[k]) return k; }
+  return null;
+}
+function _nextKeyForDate(date){
+  if(!sessions[date]) return date;
+  for(let n=2;n<=99;n++){ const k=`${date}_${n}`; if(!sessions[k]) return k; }
+  return `${date}_99`;
+}
+
 function changeSessionDate(date){
   if(!date) return;
-  if(sessions[date]){
-    todayData = sessions[date];
+  const key=_firstKeyForDate(date);
+  if(key){
+    currentSessionKey=key;
+    todayData=sessions[key];
     todayData.forEach(s=>sMap[s.id]=s);
-    $('zh-in').value = todayData.map(s=>s.chinese).join('\n');
-    $('save-btn').disabled = false;
+    $('zh-in').value=todayData.map(s=>s.chinese).join('\n');
+    $('save-btn').disabled=false;
     renderResults(todayData,'results');
+    $('session-topic').value=topics[key]||'';
   } else {
+    currentSessionKey=null;
     todayData=[];
     $('zh-in').value='';
     $('results').innerHTML='';
-    $('save-btn').disabled = true;
+    $('save-btn').disabled=true;
+    $('session-topic').value='';
   }
-  $('session-topic').value = topics[date] || '';
   updateCnt();
+}
+
+function newTopic(){
+  if(todayData.length && !confirm('開始新主題前，請確認目前結果已儲存。確定清除？')) return;
+  currentSessionKey=null;
+  todayData=[];
+  todayData.forEach&&todayData.forEach(s=>delete sMap[s.id]);
+  todayData=[];
+  $('zh-in').value='';
+  $('results').innerHTML='';
+  $('session-topic').value='';
+  $('save-btn').disabled=true;
+  updateCnt();
+}
+
+function deleteSession(key){
+  const label=topics[key]?`「${topics[key]}」`:'這筆';
+  if(!confirm(`確定刪除${label}的記錄？此操作無法復原。`)) return;
+  delete sessions[key];
+  delete topics[key];
+  localStorage.setItem('eng_sessions',JSON.stringify(sessions));
+  localStorage.setItem('eng_topics',JSON.stringify(topics));
+  gistPushDebounced();
+  renderHistory();
 }
 
 function updateCnt(){
@@ -1576,11 +1619,13 @@ function closeDict(){ $('dict').classList.remove('show'); }
 
 function saveSession(){
   if(!todayData.length) return;
-  const d = $('session-date').value || today();
+  const date = $('session-date').value || today();
   const topic = ($('session-topic')?.value || '').trim();
-  sessions[d] = todayData;
+  const key = currentSessionKey || _nextKeyForDate(date);
+  currentSessionKey = key;
+  sessions[key] = todayData;
   localStorage.setItem('eng_sessions', JSON.stringify(sessions));
-  if(topic){ topics[d]=topic; } else { delete topics[d]; }
+  if(topic){ topics[key]=topic; } else { delete topics[key]; }
   localStorage.setItem('eng_topics', JSON.stringify(topics));
   const btn=$('save-btn');
   const orig=btn.innerHTML;
@@ -1593,6 +1638,7 @@ function clearToday(){
   if(todayData.length && !confirm('確定清除今日的翻譯結果嗎？')) return;
   todayData.forEach(s=>delete sMap[s.id]);
   todayData=[];
+  currentSessionKey=null;
   $('zh-in').value='';$('results').innerHTML='';
   $('save-btn').disabled=true;updateCnt();
 }
@@ -1607,28 +1653,50 @@ function showTab(name,btn){
 }
 
 function renderHistory(){
-  const dates=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
-  if(!dates.length){
+  const allKeys=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  if(!allKeys.length){
     $('hist-list').innerHTML='<div class="empty">📭<br>還沒有學習紀錄<br><span style="font-size:.82rem">先在今日學習頁面輸入並儲存句子</span></div>';
     return;
   }
+  // Group by date prefix (first 10 chars)
+  const byDate={}, dateOrder=[];
+  allKeys.forEach(key=>{
+    const d=key.slice(0,10);
+    if(!byDate[d]){byDate[d]=[];dateOrder.push(d);}
+    byDate[d].push(key);
+  });
   const colBar=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
     <button class="btn btn-ghost btn-sm" onclick="collapseAll('hist-list')">${SVG.chevronsUp}&ensp;收起全部</button>
   </div>`;
-  $('hist-list').innerHTML=colBar+dates.map(d=>{
-    const ss=sessions[d];ss.forEach(s=>sMap[s.id]=s);
+  $('hist-list').innerHTML=colBar+dateOrder.map(date=>{
+    const keys=byDate[date];
+    const total=keys.reduce((n,k)=>n+sessions[k].length,0);
+    const badge=total+'句'+(keys.length>1?' · '+keys.length+'個主題':'');
+    const subsHTML=keys.map((key,idx)=>{
+      const ss=sessions[key]; ss.forEach(s=>sMap[s.id]=s);
+      const tLabel=topics[key]||(keys.length>1?`主題 ${idx+1}`:'（無主題）');
+      const tColor=topics[key]?'var(--text2)':'var(--text3)';
+      return `
+      <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px">
+        <button class="hist-btn" style="background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
+          <span style="color:${tColor};font-size:.88rem">${tLabel}&ensp;<span class="badge" style="font-size:.58rem">${ss.length} 句</span></span>
+          <div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
+            <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
+            <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
+          </div>
+        </button>
+        <div class="hist-detail" id="hd-${key}">
+          ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
+        </div>
+      </div>`;
+    }).join('');
     return `
-    <button class="hist-btn" onclick="toggleHist('${d}')">
-      <span>${SVG.calDays}&ensp;${d}${topics[d]?`<span style="color:var(--text3);font-weight:300;font-size:.82rem;margin-left:8px">· ${topics[d]}</span>`:''}</span>
-      <span class="badge">${ss.length} 句</span>
+    <button class="hist-btn" onclick="toggleHist('date-${date}')">
+      <span>${SVG.calDays}&ensp;${date}</span>
+      <span class="badge">${badge}</span>
     </button>
-    <div class="hist-detail" id="hd-${d}">
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',false)">${SVG.play}&ensp;播放全部</button>
-        <button class="btn btn-ghost btn-sm" onclick="playAll('${d}',true)">${SVG.repeat}&ensp;循環播放</button>
-      </div>
-      ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
-    </div>`;
+    <div class="hist-detail" id="hd-date-${date}">${subsHTML}</div>`;
   }).join('');
 }
 function toggleHist(d){ $(`hd-${d}`)?.classList.toggle('open'); }
@@ -1645,10 +1713,10 @@ function highlight(text, q){
 
 function filterHistory(query){
   const q = query.trim().toLowerCase();
-  const dates = Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  const allKeys = Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
   const countEl = $('search-count');
 
-  if(!dates.length){
+  if(!allKeys.length){
     $('hist-list').innerHTML='<div class="empty">📭<br>還沒有學習紀錄</div>';
     countEl.textContent=''; return;
   }
@@ -1660,8 +1728,8 @@ function filterHistory(query){
   let totalMatches = 0;
   let html = '';
 
-  dates.forEach(d=>{
-    const ss = sessions[d];
+  allKeys.forEach(key=>{
+    const ss = sessions[key];
     const matched = ss.filter(s=>
       s.chinese.toLowerCase().includes(q) ||
       s.english.toLowerCase().includes(q)
@@ -1669,14 +1737,16 @@ function filterHistory(query){
     if(!matched.length) return;
     totalMatches += matched.length;
     ss.forEach(s=>sMap[s.id]=s);
+    const date=key.slice(0,10);
+    const tLabel=topics[key]?` · ${topics[key]}`:'';
 
     html += `
-    <button class="hist-btn" onclick="toggleHist('search-${d}')">
-      <span>${SVG.calDays}&ensp;${d}</span>
+    <button class="hist-btn" onclick="toggleHist('search-${key}')">
+      <span>${SVG.calDays}&ensp;${date}${tLabel}</span>
       <span class="badge">${matched.length} 筆符合</span>
     </button>
-    <div class="hist-detail open" id="hd-search-${d}">
-      ${matched.map((s,i)=>cardHTML(s,i,{numLabel:d,showRec:false})).join('')}
+    <div class="hist-detail open" id="hd-search-${key}">
+      ${matched.map((s,i)=>cardHTML(s,i,{numLabel:date,showRec:false})).join('')}
     </div>`;
   });
 
@@ -1690,9 +1760,13 @@ function filterHistory(query){
 }
 
 function renderPracticeOpts(){
-  const dates=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
-  $('prac-sel').innerHTML='<option value="">── 選擇日期 ──</option>'+
-    dates.map(d=>`<option value="${d}">${d}${topics[d]?' · '+topics[d]:''}（${sessions[d].length} 句）</option>`).join('');
+  const allKeys=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  $('prac-sel').innerHTML='<option value="">── 選擇日期/主題 ──</option>'+
+    allKeys.map(key=>{
+      const date=key.slice(0,10);
+      const t=topics[key];
+      return `<option value="${key}">${date}${t?' · '+t:''}（${sessions[key].length} 句）</option>`;
+    }).join('');
 }
 
 function startPractice(){
