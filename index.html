@@ -279,6 +279,17 @@ select option{background:var(--bg2);color:var(--text)}
 .hist-btn:hover{border-color:var(--border2);color:var(--text);background:var(--surface2)}
 .hist-detail{display:none;padding-left:12px;margin-top:4px}
 .hist-detail.open{display:block}
+.month-hdr{
+  width:100%;text-align:left;padding:12px 18px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:2px;
+  cursor:pointer;margin-bottom:6px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text2);font-weight:400;transition:.2s;font-family:inherit;
+}
+.month-hdr:hover{border-color:var(--border2);background:var(--surface2);color:var(--text)}
+.month-body{display:none;padding-left:6px;border-left:2px solid var(--border);margin-bottom:8px}
+.month-body.open{display:block}
 
 /* ── practice ── */
 .p-card{
@@ -790,6 +801,22 @@ function init(){
   updateCnt();
   applyIcons();
   gistPull(true);
+
+  // ── restore last tab / practice / scroll ──
+  const savedTab=localStorage.getItem('ui_tab')||'today';
+  history.replaceState({tab:savedTab},'');
+  if(savedTab!=='today'){
+    showTab(savedTab,null,false);
+    if(savedTab==='practice'){
+      const savedKey=localStorage.getItem('ui_practiceKey');
+      if(savedKey && sessions[savedKey]){
+        $('prac-sel').value=savedKey;
+        startPractice();
+        const savedScroll=parseInt(localStorage.getItem('ui_scrollY')||'0');
+        if(savedScroll>0) setTimeout(()=>window.scrollTo(0,savedScroll),250);
+      }
+    }
+  }
 }
 
 function _firstKeyForDate(date){
@@ -1646,10 +1673,14 @@ function clearToday(){
   $('save-btn').disabled=true;updateCnt();
 }
 
-function showTab(name,btn){
+function showTab(name,btn,_push=true){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
-  $(`page-${name}`).classList.add('on');btn.classList.add('on');
+  $(`page-${name}`).classList.add('on');
+  if(btn) btn.classList.add('on');
+  else document.querySelector(`.tab[onclick*="'${name}'"]`)?.classList.add('on');
+  localStorage.setItem('ui_tab',name);
+  if(_push) history.pushState({tab:name},'');
   if(name==='history')  renderHistory();
   if(name==='practice') renderPracticeOpts();
   if(name==='notes')    renderNotes();
@@ -1661,50 +1692,77 @@ function renderHistory(){
     $('hist-list').innerHTML='<div class="empty">📭<br>還沒有學習紀錄<br><span style="font-size:.82rem">先在今日學習頁面輸入並儲存句子</span></div>';
     return;
   }
-  // Group by date prefix (first 10 chars)
+  // Group by date
   const byDate={}, dateOrder=[];
   allKeys.forEach(key=>{
     const d=key.slice(0,10);
     if(!byDate[d]){byDate[d]=[];dateOrder.push(d);}
     byDate[d].push(key);
   });
+  // Group dates by month
+  const byMonth={}, monthOrder=[];
+  dateOrder.forEach(date=>{
+    const ym=date.slice(0,7);
+    if(!byMonth[ym]){byMonth[ym]=[];monthOrder.push(ym);}
+    byMonth[ym].push(date);
+  });
   const colBar=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
     <button class="btn btn-ghost btn-sm" onclick="collapseAll('hist-list')">${SVG.chevronsUp}&ensp;收起全部</button>
   </div>`;
-  $('hist-list').innerHTML=colBar+dateOrder.map(date=>{
-    const keys=byDate[date];
-    const total=keys.reduce((n,k)=>n+sessions[k].length,0);
-    const badge=total+'句'+(keys.length>1?' · '+keys.length+'個主題':'');
-    const subsHTML=keys.map((key,idx)=>{
-      const ss=sessions[key]; ss.forEach(s=>sMap[s.id]=s);
-      const tLabel=topics[key]||(keys.length>1?`主題 ${idx+1}`:'（無主題）');
-      const tColor=topics[key]?'var(--text2)':'var(--text3)';
-      return `
-      <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px">
-        <div class="hist-btn" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
-          <span style="color:${tColor};font-size:.88rem">${tLabel}&ensp;<span class="badge" style="font-size:.58rem">${ss.length} 句</span></span>
-          <div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
-            <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
-            <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
-            <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
+  $('hist-list').innerHTML=colBar+monthOrder.map((ym,mIdx)=>{
+    const [y,mo]=ym.split('-');
+    const totalTopics=byMonth[ym].reduce((acc,d)=>acc+byDate[d].length,0);
+    const open=mIdx===0;
+    const datesHTML=byMonth[ym].map(date=>{
+      const keys=byDate[date];
+      const total=keys.reduce((n,k)=>n+sessions[k].length,0);
+      const badge=total+'句'+(keys.length>1?' · '+keys.length+'個主題':'');
+      const subsHTML=keys.map((key,idx)=>{
+        const ss=sessions[key]; ss.forEach(s=>sMap[s.id]=s);
+        const tLabel=topics[key]||(keys.length>1?`主題 ${idx+1}`:'（無主題）');
+        const tColor=topics[key]?'var(--text2)':'var(--text3)';
+        return `
+        <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px">
+          <div class="hist-btn" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
+            <span style="color:${tColor};font-size:.88rem">${tLabel}&ensp;<span class="badge" style="font-size:.58rem">${ss.length} 句</span></span>
+            <div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
+              <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
+              <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
+            </div>
           </div>
-        </div>
-        <div class="hist-detail" id="hd-${key}">
-          ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
-        </div>
-      </div>`;
+          <div class="hist-detail" id="hd-${key}">
+            ${ss.map((s,i)=>cardHTML(s,i,{showRec:false})).join('')}
+          </div>
+        </div>`;
+      }).join('');
+      return `
+      <button class="hist-btn" onclick="toggleHist('date-${date}')">
+        <span>${SVG.calDays}&ensp;${date}</span>
+        <span class="badge">${badge}</span>
+      </button>
+      <div class="hist-detail" id="hd-date-${date}">${subsHTML}</div>`;
     }).join('');
     return `
-    <button class="hist-btn" onclick="toggleHist('date-${date}')">
-      <span>${SVG.calDays}&ensp;${date}</span>
-      <span class="badge">${badge}</span>
+    <button class="month-hdr" id="mh-${ym}" onclick="toggleMonthHist('${ym}')">
+      <span>${y}年${parseInt(mo)}月</span>
+      <span style="display:flex;align-items:center;gap:8px"><span class="badge">${totalTopics} 主題</span><span id="marr-${ym}">${open?'▲':'▼'}</span></span>
     </button>
-    <div class="hist-detail" id="hd-date-${date}">${subsHTML}</div>`;
+    <div class="month-body ${open?'open':''}" id="mb-${ym}">${datesHTML}</div>`;
   }).join('');
 }
 function toggleHist(d){ $(`hd-${d}`)?.classList.toggle('open'); }
+function toggleMonthHist(ym){
+  const body=$(`mb-${ym}`);
+  if(!body) return;
+  const open=body.classList.toggle('open');
+  const arr=$(`marr-${ym}`);
+  if(arr) arr.textContent=open?'▲':'▼';
+}
 function collapseAll(containerId){
   $(containerId).querySelectorAll('.hist-detail').forEach(el=>el.classList.remove('open'));
+  $(containerId).querySelectorAll('.month-body').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('[id^="marr-"]').forEach(arr=>arr.textContent='▼');
 }
 
 function highlight(text, q){
@@ -1764,17 +1822,28 @@ function filterHistory(query){
 
 function renderPracticeOpts(){
   const allKeys=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
+  const byMonth={}, monthOrder=[];
+  allKeys.forEach(key=>{
+    const ym=key.slice(0,7);
+    if(!byMonth[ym]){byMonth[ym]=[];monthOrder.push(ym);}
+    byMonth[ym].push(key);
+  });
   $('prac-sel').innerHTML='<option value="">── 選擇日期/主題 ──</option>'+
-    allKeys.map(key=>{
-      const date=key.slice(0,10);
-      const t=topics[key];
-      return `<option value="${key}">${date}${t?' · '+t:''}（${sessions[key].length} 句）</option>`;
+    monthOrder.map(ym=>{
+      const [y,mo]=ym.split('-');
+      const opts=byMonth[ym].map(key=>{
+        const date=key.slice(0,10);
+        const t=topics[key];
+        return `<option value="${key}">${date}${t?' · '+t:''}（${sessions[key].length} 句）</option>`;
+      }).join('');
+      return `<optgroup label="${y}年${parseInt(mo)}月">${opts}</optgroup>`;
     }).join('');
 }
 
 function startPractice(){
   const d=$('prac-sel').value;
   if(!d||!sessions[d]){ alert('請先選擇一個日期'); return; }
+  localStorage.setItem('ui_practiceKey',d);
   const ss=sessions[d];ss.forEach(s=>sMap[s.id]=s);
   $('prac-list').innerHTML=`<div class="sec-title">${d} 的練習（${ss.length} 句）</div>`+
     ss.map((s,i)=>`
@@ -1850,8 +1919,21 @@ setInterval(()=>{
   }
 }, 250);
 
+// ── back-navigation guard ──────────────────────────
+window.addEventListener('popstate', e=>{
+  const tab=e.state?.tab||'today';
+  showTab(tab,null,false);
+});
+window.addEventListener('pagehide', ()=>{
+  localStorage.setItem('ui_scrollY',window.scrollY);
+});
+
 document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden || !playId || !playMode) return;
+  if(document.hidden){
+    localStorage.setItem('ui_scrollY',window.scrollY);
+    return;
+  }
+  if(!playId || !playMode) return;
   if(speechSynthesis.paused){
     speechSynthesis.resume();
   } else if(!speechSynthesis.speaking && !speechSynthesis.pending){
