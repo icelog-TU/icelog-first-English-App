@@ -868,6 +868,7 @@ let topics          = JSON.parse(localStorage.getItem('eng_topics') || '{}');
 let currentSessionKey = null; // null = new session; string = key of session being edited
 let freshTranslation  = false; // true after doTranslate(), reset when session loaded
 let _pendingSaveDate  = null;
+let _currentHistModalKey = null;
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllLoop = false;
@@ -1047,6 +1048,7 @@ function toggleCfgSection(id){
 
 function openHistModal(key){
   const ss=sessions[key]; if(!ss) return;
+  _currentHistModalKey=key;
   ss.forEach(s=>sMap[s.id]=s);
   const date=key.slice(0,10);
   const topic=topics[key]||'（無主題）';
@@ -1060,6 +1062,14 @@ function openHistModal(key){
 function closeHistModal(e){
   if(e && e.target!==$('hist-modal')) return;
   $('hist-modal').classList.add('hide');
+  _currentHistModalKey=null;
+}
+
+function _rerenderHistModal(){
+  const key=_currentHistModalKey;
+  if(!key||!sessions[key]) return;
+  sessions[key].forEach(s=>sMap[s.id]=s);
+  $('hist-modal-body').innerHTML=sessions[key].map((s,i)=>cardHTML(s,i,{showRec:true})).join('');
 }
 
 function setupKey(){
@@ -1476,6 +1486,7 @@ function _findSentence(sid){
   return null;
 }
 function _rerenderActive(){
+  if(_currentHistModalKey){ _rerenderHistModal(); return; }
   const active=document.querySelector('.page.on')?.id;
   if(active==='page-today') renderResults(todayData,'results');
   else if(active==='page-history') renderHistory();
@@ -1518,6 +1529,7 @@ function toggleHighlight(id){
     highlights[id]={note:'',discussion:[],date,chinese:s.chinese,english:s.english};
   }
   saveHighlights();
+  if(_currentHistModalKey){ _rerenderHistModal(); return; }
   const active=document.querySelector('.page.on')?.id;
   if(active==='page-today')  renderResults(todayData,'results');
   else if(active==='page-history')  renderHistory();
