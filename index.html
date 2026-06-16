@@ -610,7 +610,14 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
           只勾選 <strong style="color:var(--text);font-weight:400">gist</strong> 範圍即可。
         </p>
         <div id="gist-status" style="font-size:.78rem;min-height:1.3em;margin-bottom:8px;color:var(--g2)"></div>
-        <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="gistSync()">啟用 / 立即同步</button>
+        <div class="row" style="gap:8px">
+          <button class="btn btn-solid" style="flex:1;justify-content:center" onclick="gistUpload()">⬆&ensp;上傳到雲端</button>
+          <button class="btn btn-solid" style="flex:1;justify-content:center" onclick="gistDownload()">⬇&ensp;從雲端下載</button>
+        </div>
+        <p style="font-size:.72rem;color:var(--text3);margin-top:8px;line-height:1.6">
+          <strong style="color:var(--text2);font-weight:400">上傳</strong>：把這台裝置的資料送到雲端（會跟雲端現有資料合併，不會刪除雲端內容）。<br>
+          <strong style="color:var(--text2);font-weight:400">下載</strong>：把雲端資料抓回這台裝置（會跟本機資料合併，完成後自動整理頁面顯示最新內容）。
+        </p>
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
           <label class="lbl" style="margin-bottom:7px">Token 到期日提醒</label>
           <input type="date" id="cfg-token-expiry" onchange="saveTokenExpiry(this.value)">
@@ -1302,8 +1309,10 @@ async function gistPull(silent){
       localStorage.setItem('eng_highlights',newH);
       localStorage.setItem('eng_topics',newT);
       localStorage.setItem('gist_last_push',new Date().toISOString());
-      if(silent){ location.reload(); return; }
-      _gistShowStatus('✓ 已從雲端更新資料');
+      // 重新整理頁面，讓畫面上的資料（記憶體中的 sessions/highlights/topics）跟剛剛更新的 localStorage 同步，
+      // 否則畫面會繼續顯示舊資料，即使 localStorage 已經是最新的
+      location.reload();
+      return;
     } else {
       if(!silent) _gistShowStatus('✓ 資料已是最新');
     }
@@ -1312,16 +1321,27 @@ async function gistPull(silent){
   }
 }
 
-async function gistSync(){
+function _gistSavePat(){
   const pat=($('cfg-gist-pat')?.value||'').trim()||localStorage.getItem('github_pat')||'';
-  if(!pat){ _gistShowStatus('請輸入 GitHub Token',true); return; }
+  if(!pat){ _gistShowStatus('請輸入 GitHub Token',true); return null; }
+  const oldPat=localStorage.getItem('github_pat');
+  if(pat!==oldPat) localStorage.removeItem('gist_id');
   localStorage.setItem('github_pat',pat);
-  if(pat!==localStorage.getItem('github_pat')) localStorage.removeItem('gist_id');
-  _gistShowStatus('同步中…');
-  await gistPull(false);
+  return pat;
+}
+
+async function gistUpload(){
+  if(!_gistSavePat()) return;
+  _gistShowStatus('上傳中…');
   await gistPush(false);
   const ts=localStorage.getItem('gist_last_push');
-  _gistShowStatus('✓ 同步完成！'+(ts?' 上次：'+new Date(ts).toLocaleString('zh-TW'):''));
+  _gistShowStatus('✓ 已上傳到雲端'+(ts?'（'+new Date(ts).toLocaleString('zh-TW')+'）':''));
+}
+
+async function gistDownload(){
+  if(!_gistSavePat()) return;
+  _gistShowStatus('下載中…');
+  await gistPull(false);
 }
 
 let _gistPushTimer=null;
