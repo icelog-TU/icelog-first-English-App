@@ -291,6 +291,16 @@ select option{background:var(--bg2);color:var(--text)}
 .month-body{display:none;padding-left:6px;border-left:2px solid var(--border);margin-bottom:8px}
 .month-body.open{display:block}
 
+/* ── token expiry warning banner ── */
+.token-warn{
+  background:rgba(228,76,101,.1);
+  border-bottom:1px solid rgba(228,76,101,.35);
+  padding:10px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.token-warn.hide{display:none}
+.token-warn-msg{font-size:.82rem;color:var(--g2);line-height:1.5}
+
 /* ── settings accordion ── */
 .cfg-section{border-bottom:1px solid var(--border)}
 .cfg-hdr{
@@ -601,6 +611,11 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
         </p>
         <div id="gist-status" style="font-size:.78rem;min-height:1.3em;margin-bottom:8px;color:var(--g2)"></div>
         <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="gistSync()">啟用 / 立即同步</button>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <label class="lbl" style="margin-bottom:7px">Token 到期日提醒</label>
+          <input type="date" id="cfg-token-expiry" onchange="saveTokenExpiry(this.value)">
+          <p style="font-size:.74rem;color:var(--text3);margin-top:7px;line-height:1.6">填入你的 Token 到期日，App 將在到期前 5 天彈出提醒。</p>
+        </div>
       </div>
     </div>
 
@@ -731,6 +746,15 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
   <button class="tab"     onclick="showTab('practice',this)">練習模式</button>
   <button class="tab"     onclick="showTab('notes',this)"   >重點筆記</button>
 </nav>
+
+<!-- Token expiry warning banner -->
+<div id="token-warn" class="token-warn hide">
+  <span id="token-warn-msg" class="token-warn-msg"></span>
+  <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+    <button class="btn btn-ghost btn-sm" style="color:var(--g2);border-color:rgba(228,76,101,.4)" onclick="openSettings()">前往設定</button>
+    <button onclick="dismissTokenWarn()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.1rem;padding:0 2px;line-height:1">✕</button>
+  </div>
+</div>
 
 <!-- TODAY -->
 <section class="page on" id="page-today">
@@ -925,6 +949,7 @@ function init(){
   updateCnt();
   applyIcons();
   freshTranslation = false;
+  checkTokenExpiry();
   gistPull(true);
 
   // ── restore last tab / practice / scroll ──
@@ -1057,7 +1082,40 @@ function openSettings(){
   $('rec-vol-pct').textContent = Math.round(recVolume*100)+'%';
   const recCount = Object.keys(JSON.parse(localStorage.getItem('eng_recordings')||'{}')).length;
   $('rec-storage-info').textContent = recCount ? `目前已儲存 ${recCount} 筆錄音` : '目前沒有已儲存的錄音';
+  const expiry = localStorage.getItem('github_token_expiry');
+  if(expiry) $('cfg-token-expiry').value = expiry;
   $('cfg-modal').classList.remove('hide');
+}
+
+function saveTokenExpiry(date){
+  if(date) localStorage.setItem('github_token_expiry', date);
+  else localStorage.removeItem('github_token_expiry');
+  checkTokenExpiry();
+}
+
+function checkTokenExpiry(){
+  const expiry = localStorage.getItem('github_token_expiry');
+  if(!expiry) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp   = new Date(expiry); exp.setHours(0,0,0,0);
+  const days  = Math.round((exp - today) / 86400000);
+  if(days < 0){
+    showTokenWarn('⚠️ GitHub Token 已過期，請立即前往設定更新！');
+  } else if(days <= 5){
+    const when = days === 0 ? '今天' : days === 1 ? '明天' : `${days} 天後`;
+    showTokenWarn(`⚠️ GitHub Token 將於${when}到期（${expiry}），請提早前往設定更新。`);
+  } else {
+    $('token-warn').classList.add('hide');
+  }
+}
+
+function showTokenWarn(msg){
+  $('token-warn-msg').textContent = msg;
+  $('token-warn').classList.remove('hide');
+}
+
+function dismissTokenWarn(){
+  $('token-warn').classList.add('hide');
 }
 
 function clearAllRecordings(){
