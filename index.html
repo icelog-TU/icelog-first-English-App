@@ -1745,6 +1745,7 @@ function showNowPlaying(id, mode){
   requestAnimationFrame(()=>{
     const barH=$('now-playing').offsetHeight;
     document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom=(barH+10)+'px');
+    $('hist-modal-body').style.paddingBottom=(barH+20)+'px';
     $('dict').style.bottom=(18+barH)+'px';
   });
 }
@@ -1752,6 +1753,7 @@ function showNowPlaying(id, mode){
 function hideNowPlaying(){
   $('now-playing').style.display='none';
   document.querySelectorAll('.page').forEach(p=>p.style.paddingBottom='');
+  $('hist-modal-body').style.paddingBottom='';
   $('dict').style.bottom='';
 }
 
