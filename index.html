@@ -860,6 +860,7 @@ let recChunks = [];
 let ttsUtter  = null;
 let playId    = null;
 let playMode  = null;
+let _activePlayText = null;
 let shadowTimer = null;
 let ttsVolume  = parseFloat(localStorage.getItem('tts_vol') || '0.9');
 let recVolume  = parseFloat(localStorage.getItem('rec_vol') || '0.5');
@@ -1640,7 +1641,7 @@ function renderNotes(){
 
 document.addEventListener('click', e=>{
   const pb=e.target.closest('[data-play]');
-  if(pb){ handlePlay(pb.dataset.play, pb.dataset.pid); return; }
+  if(pb){ handlePlay(pb.dataset.play, pb.dataset.pid, pb.dataset.prefer==='1'); return; }
   const rc=e.target.closest('[data-rec]');
   if(rc){ toggleRec(rc.dataset.rec); return; }
   const wd=e.target.closest('.w');
@@ -1727,7 +1728,7 @@ function stopPlayback(){
       b.classList.remove('p-active','p-dim');
     });
   }
-  playId=null; playMode=null;
+  playId=null; playMode=null; _activePlayText=null;
   hideNowPlaying();
 }
 
@@ -1785,16 +1786,18 @@ function setPlayUI(id, activeMode){
   });
 }
 
-function handlePlay(mode, id){
+function handlePlay(mode, id, usePreferred){
   if(playId===id && playMode===mode){ stopPlayback(); return; }
   stopPlayback();
   const s=sMap[id]; if(!s) return;
+  const text=usePreferred?_preferredText(s):s.english;
+  _activePlayText=text;
   playId=id; playMode=mode;
   setPlayUI(id, mode);
   showNowPlaying(id, mode);
-  if(mode==='once')   playOnce(id,s);
-  else if(mode==='loop')   playLoop(id,s);
-  else if(mode==='shadow') playShadow(id,s);
+  if(mode==='once')   playOnce(id,text);
+  else if(mode==='loop')   playLoop(id,text);
+  else if(mode==='shadow') playShadow(id,text);
 }
 
 function mkUtter(text){
@@ -1803,16 +1806,16 @@ function mkUtter(text){
   return u;
 }
 
-function playOnce(id,s){
-  ttsUtter=mkUtter(s.english);
+function playOnce(id,text){
+  ttsUtter=mkUtter(text);
   ttsUtter.onend=()=>{ stopPlayback(); };
   speechSynthesis.speak(ttsUtter);
 }
 
-function playLoop(id,s){
+function playLoop(id,text){
   function doLoop(){
     if(playId!==id||playMode!=='loop') return;
-    ttsUtter=mkUtter(s.english);
+    ttsUtter=mkUtter(text);
     ttsUtter.onend=()=>{
       if(playId===id&&playMode==='loop')
         shadowTimer=setTimeout(doLoop,400);
@@ -1822,11 +1825,11 @@ function playLoop(id,s){
   doLoop();
 }
 
-function playShadow(id,s){
+function playShadow(id,text){
   function doShadow(){
     if(playId!==id||playMode!=='shadow') return;
     let t0=null;
-    ttsUtter=mkUtter(s.english);
+    ttsUtter=mkUtter(text);
     ttsUtter.onstart=()=>{ t0=Date.now(); };
     ttsUtter.onend=()=>{
       if(playId!==id||playMode!=='shadow') return;
@@ -2195,9 +2198,9 @@ function startPractice(){
       <div class="acts" style="margin-top:9px">
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">${SVG.eye}&ensp;顯示答案</button>
         <button class="btn btn-solid btn-sm ai-check-btn" onclick="aiCheck('${s.id}',this)">${SVG.bot}&ensp;AI 批改</button>
-        <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="聽正確發音">${SVG.play} 播放</button>
+        <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" data-prefer="1" title="聽正確發音">${SVG.play} 播放</button>
       </div>
-      <div class="answer">✅&ensp;${esc(s.english)}</div>
+      <div class="answer">✅&ensp;${esc(_preferredText(s))}</div>
       <div class="ai-fb" id="ai-fb-${s.id}"></div>
     </div>`).join('');
 }
@@ -2215,15 +2218,19 @@ async function aiCheck(id, btn){
   fbEl.classList.add('show');
   if(btn) btn.disabled=true;
   const alts=s.alts||[];
-  const altsRef=alts.length?'\n其他參考版本：\n'+alts.map((a,i)=>`  版本${i+2}：${a.text}`).join('\n'):'';
+  const preferredRef=_preferredText(s);
+  const refLabel=alts.length?'參考翻譯（學習者根據母語者用法調整過，請以這個版本為主要評估依據）':'參考翻譯';
+  const aiOrigRef=alts.length?`\n原始 AI 翻譯（較貼近中文字面，僅供對照，不必拿來當評分標準）：${s.english}`:'';
+  const otherAltsRef=alts.length>1?'\n其他參考版本：\n'+alts.slice(0,-1).map((a,i)=>`  版本${i+1}：${a.text}`).join('\n'):'';
   const prompt=`你是一位友善的英文老師，請評估學習者的英文翻譯是否正確表達了中文意思。
 
 原文中文：${s.chinese}
-參考翻譯：${s.english}${altsRef}
+${refLabel}：${preferredRef}${aiOrigRef}${otherAltsRef}
 學習者的答案：${userAns}
 
 評估原則：
 • 最重要的是：學習者的答案有沒有準確傳達中文的意思？
+• 請以「${refLabel}」這個版本為主要評估基準，因為它比原始 AI 翻譯更自然、更貼近母語者的講法
 • 不需要跟參考翻譯一模一樣，只要意思正確、英文自然就算對
 • 檢查有無語法錯誤或用詞不當
 
@@ -2282,10 +2289,9 @@ document.addEventListener('visibilitychange', ()=>{
   if(speechSynthesis.paused){
     speechSynthesis.resume();
   } else if(!speechSynthesis.speaking && !speechSynthesis.pending){
-    const s = sMap[playId];
-    if(s){
-      if(playMode==='loop')   playLoop(playId, s);
-      else if(playMode==='shadow') playShadow(playId, s);
+    if(_activePlayText){
+      if(playMode==='loop')   playLoop(playId, _activePlayText);
+      else if(playMode==='shadow') playShadow(playId, _activePlayText);
     }
   }
 });
