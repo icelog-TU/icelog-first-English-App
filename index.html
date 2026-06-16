@@ -371,7 +371,7 @@ select option{background:var(--bg2);color:var(--text)}
   position:fixed;bottom:18px;right:18px;width:295px;max-height:380px;overflow-y:auto;
   background:var(--bg2);border:1px solid var(--border2);border-radius:2px;padding:18px;
   box-shadow:0 12px 48px rgba(0,0,0,.6);
-  z-index:50;display:none;
+  z-index:250;display:none;
 }
 #dict::before{
   content:'';position:absolute;top:0;left:0;right:0;height:2px;
@@ -869,6 +869,8 @@ let currentSessionKey = null; // null = new session; string = key of session bei
 let freshTranslation  = false; // true after doTranslate(), reset when session loaded
 let _pendingSaveDate  = null;
 let _currentHistModalKey = null;
+let _recAudio = null;
+let _recPlayingId = null;
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllLoop = false;
@@ -1859,8 +1861,38 @@ async function toggleRec(id){
   }
 }
 function playRec(id){
+  // 同一個錄音再點一次 → 中途停止
+  if(_recPlayingId===id && _recAudio && !_recAudio.paused){
+    _recAudio.pause();
+    _recAudio.currentTime=0;
+    _recAudio=null; _recPlayingId=null;
+    _setRecBtn(id,false);
+    return;
+  }
+  // 停掉任何正在播放的錄音
+  if(_recAudio){
+    _recAudio.pause();
+    _recAudio.currentTime=0;
+    if(_recPlayingId) _setRecBtn(_recPlayingId,false);
+    _recAudio=null; _recPlayingId=null;
+  }
   const u=recordings[id]; if(!u) return;
-  const a=new Audio(u); a.volume=recVolume; a.play();
+  const a=new Audio(u);
+  a.volume=recVolume;
+  _recAudio=a; _recPlayingId=id;
+  _setRecBtn(id,true);
+  a.play();
+  a.onended=()=>{
+    _recAudio=null; _recPlayingId=null;
+    _setRecBtn(id,false);
+  };
+}
+
+function _setRecBtn(id,playing){
+  const rp=$(`rp-${id}`); if(!rp) return;
+  const btn=rp.querySelector('button'); if(!btn) return;
+  btn.textContent=playing?'⏹ 停止':'播放錄音';
+  btn.style.color=playing?'var(--red)':'';
 }
 
 async function lookupWord(word){
