@@ -291,6 +291,36 @@ select option{background:var(--bg2);color:var(--text)}
 .month-body{display:none;padding-left:6px;border-left:2px solid var(--border);margin-bottom:8px}
 .month-body.open{display:block}
 
+/* ── settings accordion ── */
+.cfg-section{border-bottom:1px solid var(--border)}
+.cfg-hdr{
+  width:100%;text-align:left;padding:13px 0;
+  background:none;border:none;cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;
+  color:var(--text2);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  font-family:inherit;transition:color .2s;
+}
+.cfg-hdr:hover{color:var(--text)}
+.cfg-arr{font-size:.65rem;transition:transform .25s;display:inline-block}
+.cfg-body{display:none;padding-bottom:16px}
+.cfg-body.open{display:block}
+
+/* ── history detail modal ── */
+#hist-modal-inner{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:2px;
+  width:min(640px,96vw);max-height:92svh;overflow-y:auto;
+  box-shadow:0 30px 80px rgba(0,0,0,.65);
+}
+.hist-modal-hdr{
+  position:sticky;top:0;z-index:10;background:var(--bg2);
+  padding:16px 20px 12px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+}
+.hist-modal-hdr::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--gradient);
+}
+
 /* ── practice ── */
 .p-card{
   background:var(--surface);border:1px solid var(--border);border-radius:2px;
@@ -538,74 +568,122 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
       onmouseout="this.style.background='rgba(255,255,255,.07)'"
       title="關閉">✕</button>
     <h2>設定</h2>
-    <label class="lbl" style="margin-top:14px">OpenAI API 金鑰</label>
-    <input type="password" id="cfg-key" class="mb3">
 
-    <label class="lbl" style="margin-top:6px">AI 語音音量</label>
-    <div class="vol-row">
-      <input type="range" id="tts-vol" min="0" max="1" step="0.05"
-             oninput="updateVol('tts',this.value)">
-      <span class="vol-pct" id="tts-vol-pct"></span>
-    </div>
-
-    <label class="lbl">錄音回放音量</label>
-    <div class="vol-row" style="margin-bottom:20px">
-      <input type="range" id="rec-vol" min="0" max="1" step="0.05"
-             oninput="updateVol('rec',this.value)">
-      <span class="vol-pct" id="rec-vol-pct"></span>
-    </div>
-
-    <div class="row" style="margin-top:4px">
-      <button class="btn btn-solid" style="flex:1;justify-content:center" onclick="saveSettings()">儲存</button>
-      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="hideModal('cfg-modal')">取消</button>
-    </div>
-
-    <!-- GitHub Gist 雲端同步 -->
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-      <div class="lbl" style="margin-bottom:4px">GitHub 雲端同步（推薦）</div>
-      <p style="font-size:.76rem;color:var(--text3);margin:0 0 10px;line-height:1.6">輸入 GitHub Token，所有裝置自動共用學習資料，不需手動傳檔。</p>
-      <label class="lbl" style="margin-bottom:5px">GitHub Personal Access Token</label>
-      <input type="password" id="cfg-gist-pat" class="mb3" placeholder="ghp_xxxx… （只需要 gist 權限）">
-      <p style="font-size:.74rem;color:var(--text3);margin:-4px 0 10px;line-height:1.65">
-        沒有 Token？請到
-        <a href="https://github.com/settings/tokens/new?scopes=gist&description=EnglishLearningApp" target="_blank"
-           style="color:var(--g2);border-bottom:1px dotted rgba(228,76,101,.4)">GitHub → 建立 Token（點此）</a>，
-        只勾選 <strong style="color:var(--text);font-weight:400">gist</strong> 範圍即可。
-      </p>
-      <div id="gist-status" style="font-size:.78rem;min-height:1.3em;margin-bottom:8px;color:var(--g2)"></div>
-      <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="gistSync()">啟用 / 立即同步</button>
-    </div>
-
-    <!-- 手動備份（備用方案） -->
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-      <div class="lbl" style="margin-bottom:4px">資料備份與同步</div>
-      <p style="font-size:.76rem;color:var(--text3);margin:0 0 12px;line-height:1.6">學習記錄只存在瀏覽器本機。換裝置前，請先備份資料，再到新裝置匯入。</p>
-
-      <div class="lbl" style="margin-bottom:6px">① 匯出（從這臺裝置備份）</div>
-      <div class="row" style="gap:8px;margin-bottom:8px">
-        <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" id="copy-backup-btn" onclick="copyBackup()">複製資料</button>
-        <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="downloadBackup()">下載備份</button>
+    <!-- ① GitHub 雲端同步（最常用，預設展開） -->
+    <div class="cfg-section">
+      <button class="cfg-hdr" onclick="toggleCfgSection('cfg-sync')">
+        GitHub 雲端同步
+        <span class="cfg-arr" id="cfg-arr-sync" style="transform:rotate(180deg)">▼</span>
+      </button>
+      <div class="cfg-body open" id="cfg-sync">
+        <p style="font-size:.76rem;color:var(--text3);margin:0 0 10px;line-height:1.6">輸入 GitHub Token，所有裝置自動共用學習資料，不需手動傳檔。</p>
+        <label class="lbl" style="margin-bottom:5px">GitHub Personal Access Token</label>
+        <input type="password" id="cfg-gist-pat" class="mb3" placeholder="ghp_xxxx… （只需要 gist 權限）">
+        <p style="font-size:.74rem;color:var(--text3);margin:-4px 0 10px;line-height:1.65">
+          沒有 Token？請到
+          <a href="https://github.com/settings/tokens/new?scopes=gist&description=EnglishLearningApp" target="_blank"
+             style="color:var(--g2);border-bottom:1px dotted rgba(228,76,101,.4)">GitHub → 建立 Token（點此）</a>，
+          只勾選 <strong style="color:var(--text);font-weight:400">gist</strong> 範圍即可。
+        </p>
+        <div id="gist-status" style="font-size:.78rem;min-height:1.3em;margin-bottom:8px;color:var(--g2)"></div>
+        <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="gistSync()">啟用 / 立即同步</button>
       </div>
-      <textarea id="backup-out" readonly rows="2"
-        style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:2px;padding:8px 10px;font-size:.68rem;font-family:monospace;color:var(--text3);resize:none;line-height:1.4;margin-bottom:14px"
-        placeholder="點「複製資料」後文字會出現在這裡，長按可全選複製…"></textarea>
-
-      <div class="lbl" style="margin-bottom:6px">② 匯入（到新裝置還原）</div>
-      <textarea id="backup-in" rows="3"
-        style="width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-size:.76rem;font-family:inherit;color:var(--text);resize:vertical;line-height:1.55;transition:border-color .2s;margin-bottom:8px"
-        placeholder="把另一臺裝置「複製資料」的文字貼在這裡，再按匯入…"></textarea>
-      <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="importBackup()">匯入資料</button>
     </div>
 
-    <!-- 錄音管理 -->
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-      <div class="lbl" style="margin-bottom:4px">錄音管理</div>
-      <p style="font-size:.76rem;color:var(--text3);margin:0 0 10px;line-height:1.6">錄音檔儲存在瀏覽器本機，佔用空間較大。練習完後可一鍵清除所有錄音，釋放空間。</p>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span id="rec-storage-info" style="font-size:.78rem;color:var(--text3)"></span>
+    <!-- ② OpenAI API 金鑰 -->
+    <div class="cfg-section">
+      <button class="cfg-hdr" onclick="toggleCfgSection('cfg-api')">
+        OpenAI API 金鑰
+        <span class="cfg-arr" id="cfg-arr-api">▼</span>
+      </button>
+      <div class="cfg-body" id="cfg-api">
+        <label class="lbl" style="margin-top:8px">API 金鑰</label>
+        <input type="password" id="cfg-key" class="mb3">
+        <div class="row" style="margin-top:4px">
+          <button class="btn btn-solid" style="flex:1;justify-content:center" onclick="saveSettings()">儲存</button>
+          <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="hideModal('cfg-modal')">取消</button>
+        </div>
       </div>
-      <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--red);border-color:rgba(228,76,101,.3)" onclick="clearAllRecordings()">清除全部錄音</button>
     </div>
+
+    <!-- ③ 音量設定 -->
+    <div class="cfg-section">
+      <button class="cfg-hdr" onclick="toggleCfgSection('cfg-vol')">
+        音量設定
+        <span class="cfg-arr" id="cfg-arr-vol">▼</span>
+      </button>
+      <div class="cfg-body" id="cfg-vol">
+        <label class="lbl" style="margin-top:8px">AI 語音音量</label>
+        <div class="vol-row">
+          <input type="range" id="tts-vol" min="0" max="1" step="0.05"
+                 oninput="updateVol('tts',this.value)">
+          <span class="vol-pct" id="tts-vol-pct"></span>
+        </div>
+        <label class="lbl">錄音回放音量</label>
+        <div class="vol-row">
+          <input type="range" id="rec-vol" min="0" max="1" step="0.05"
+                 oninput="updateVol('rec',this.value)">
+          <span class="vol-pct" id="rec-vol-pct"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ 資料備份 -->
+    <div class="cfg-section">
+      <button class="cfg-hdr" onclick="toggleCfgSection('cfg-backup')">
+        資料備份
+        <span class="cfg-arr" id="cfg-arr-backup">▼</span>
+      </button>
+      <div class="cfg-body" id="cfg-backup">
+        <p style="font-size:.76rem;color:var(--text3);margin:8px 0 12px;line-height:1.6">學習記錄只存在瀏覽器本機。換裝置前，請先備份資料，再到新裝置匯入。</p>
+        <div class="lbl" style="margin-bottom:6px">① 匯出（從這臺裝置備份）</div>
+        <div class="row" style="gap:8px;margin-bottom:8px">
+          <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" id="copy-backup-btn" onclick="copyBackup()">複製資料</button>
+          <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="downloadBackup()">下載備份</button>
+        </div>
+        <textarea id="backup-out" readonly rows="2"
+          style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:2px;padding:8px 10px;font-size:.68rem;font-family:monospace;color:var(--text3);resize:none;line-height:1.4;margin-bottom:14px"
+          placeholder="點「複製資料」後文字會出現在這裡，長按可全選複製…"></textarea>
+        <div class="lbl" style="margin-bottom:6px">② 匯入（到新裝置還原）</div>
+        <textarea id="backup-in" rows="3"
+          style="width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-size:.76rem;font-family:inherit;color:var(--text);resize:vertical;line-height:1.55;transition:border-color .2s;margin-bottom:8px"
+          placeholder="把另一臺裝置「複製資料」的文字貼在這裡，再按匯入…"></textarea>
+        <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="importBackup()">匯入資料</button>
+      </div>
+    </div>
+
+    <!-- ⑤ 錄音管理 -->
+    <div class="cfg-section" style="border-bottom:none">
+      <button class="cfg-hdr" onclick="toggleCfgSection('cfg-rec')">
+        錄音管理
+        <span class="cfg-arr" id="cfg-arr-rec">▼</span>
+      </button>
+      <div class="cfg-body" id="cfg-rec">
+        <p style="font-size:.76rem;color:var(--text3);margin:8px 0 10px;line-height:1.6">錄音檔儲存在瀏覽器本機，佔用空間較大。練習完後可一鍵清除所有錄音，釋放空間。</p>
+        <span id="rec-storage-info" style="font-size:.78rem;color:var(--text3);display:block;margin-bottom:8px"></span>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--red);border-color:rgba(228,76,101,.3)" onclick="clearAllRecordings()">清除全部錄音</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History detail modal -->
+<div class="overlay hide" id="hist-modal" onclick="closeHistModal(event)">
+  <div id="hist-modal-inner">
+    <div class="hist-modal-hdr">
+      <div style="flex:1;min-width:0">
+        <div id="hist-modal-date" style="font-size:.62rem;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px"></div>
+        <div id="hist-modal-topic" style="font-size:1rem;color:var(--text);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      </div>
+      <button onclick="closeHistModal()"
+        style="flex-shrink:0;background:rgba(255,255,255,.07);border:1px solid var(--border2);
+               border-radius:50%;width:32px;height:32px;cursor:pointer;color:var(--text);
+               font-size:1rem;display:flex;align-items:center;justify-content:center;
+               line-height:1;transition:.2s"
+        onmouseover="this.style.background='rgba(228,76,101,.25)'"
+        onmouseout="this.style.background='rgba(255,255,255,.07)'">✕</button>
+    </div>
+    <div id="hist-modal-body" style="padding:20px"></div>
   </div>
 </div>
 
@@ -686,8 +764,14 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
 <section class="page" id="page-practice">
   <div class="card">
     <div class="sec-title">練習設定</div>
-    <label class="lbl">選擇要練習的日期</label>
-    <select id="prac-sel" style="margin-bottom:14px"><option value="">── 選擇日期 ──</option></select>
+    <label class="lbl">① 選擇月份</label>
+    <select id="prac-month" style="margin-bottom:14px" onchange="updatePracTopics()">
+      <option value="">── 選擇月份 ──</option>
+    </select>
+    <div id="prac-topic-wrap" style="display:none">
+      <label class="lbl">② 選擇主題</label>
+      <select id="prac-sel" style="margin-bottom:14px"><option value="">── 選擇主題 ──</option></select>
+    </div>
     <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="startPractice()">開始練習 💪</button>
   </div>
   <div id="prac-list"></div>
@@ -836,6 +920,9 @@ function init(){
     if(savedTab==='practice'){
       const savedKey=localStorage.getItem('ui_practiceKey');
       if(savedKey && sessions[savedKey]){
+        const ym=savedKey.slice(0,7);
+        $('prac-month').value=ym;
+        updatePracTopics();
         $('prac-sel').value=savedKey;
         startPractice();
         const savedScroll=parseInt(localStorage.getItem('ui_scrollY')||'0');
@@ -910,6 +997,30 @@ function updateCnt(){
 }
 
 function hideModal(id){ $(id).classList.add('hide'); }
+
+function toggleCfgSection(id){
+  const body=$(id); if(!body) return;
+  const open=body.classList.toggle('open');
+  const arr=$('cfg-arr-'+id.replace('cfg-',''));
+  if(arr) arr.style.transform=open?'rotate(180deg)':'rotate(0deg)';
+}
+
+function openHistModal(key){
+  const ss=sessions[key]; if(!ss) return;
+  ss.forEach(s=>sMap[s.id]=s);
+  const date=key.slice(0,10);
+  const topic=topics[key]||'（無主題）';
+  $('hist-modal-date').textContent=date+'  ·  '+ss.length+' 句';
+  $('hist-modal-topic').textContent=topic;
+  $('hist-modal-body').innerHTML=ss.map((s,i)=>cardHTML(s,i,{showRec:true})).join('');
+  $('hist-modal').classList.remove('hide');
+  history.pushState({tab:'history',modal:'hist'},'');
+}
+
+function closeHistModal(e){
+  if(e && e.target!==$('hist-modal')) return;
+  $('hist-modal').classList.add('hide');
+}
 
 function setupKey(){
   const k = $('setup-key').value.trim();
@@ -1792,7 +1903,7 @@ function renderHistory(){
   $('hist-list').innerHTML=colBar+monthOrder.map((ym,mIdx)=>{
     const [y,mo]=ym.split('-');
     const totalTopics=byMonth[ym].reduce((acc,d)=>acc+byDate[d].length,0);
-    const open=mIdx===0;
+    const open=false;
     const datesHTML=byMonth[ym].map(date=>{
       const keys=byDate[date];
       const total=keys.reduce((n,k)=>n+sessions[k].length,0);
@@ -1802,17 +1913,15 @@ function renderHistory(){
         const tLabel=topics[key]||(keys.length>1?`主題 ${idx+1}`:'（無主題）');
         const tColor=topics[key]?'var(--text2)':'var(--text3)';
         return `
-        <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px">
-          <div class="hist-btn" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:rgba(255,255,255,.02);margin-bottom:3px" onclick="toggleHist('${key}')">
-            <span style="color:${tColor};font-size:.88rem">${tLabel}&ensp;<span class="badge" style="font-size:.58rem">${ss.length} 句</span></span>
-            <div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
-              <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
-              <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
-              <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
-            </div>
-          </div>
-          <div class="hist-detail" id="hd-${key}">
-            ${ss.map((s,i)=>cardHTML(s,i,{showRec:true})).join('')}
+        <div style="padding-left:10px;border-left:2px solid var(--border);margin-bottom:6px">
+          <button class="hist-btn" style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.02);margin-bottom:4px;text-align:left;border-radius:2px" onclick="openHistModal('${key}')">
+            <span style="color:${tColor};font-size:.88rem;font-weight:300">${tLabel}</span>
+            <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
+          </button>
+          <div style="display:flex;gap:5px;padding-bottom:2px">
+            <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
+            <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
           </div>
         </div>`;
       }).join('');
@@ -1900,24 +2009,38 @@ function filterHistory(query){
   }
 }
 
+let _pracByMonth={}, _pracMonthOrder=[];
+
 function renderPracticeOpts(){
   const allKeys=Object.keys(sessions).sort((a,b)=>b.localeCompare(a));
-  const byMonth={}, monthOrder=[];
+  _pracByMonth={}; _pracMonthOrder=[];
   allKeys.forEach(key=>{
     const ym=key.slice(0,7);
-    if(!byMonth[ym]){byMonth[ym]=[];monthOrder.push(ym);}
-    byMonth[ym].push(key);
+    if(!_pracByMonth[ym]){_pracByMonth[ym]=[];_pracMonthOrder.push(ym);}
+    _pracByMonth[ym].push(key);
   });
-  $('prac-sel').innerHTML='<option value="">── 選擇日期/主題 ──</option>'+
-    monthOrder.map(ym=>{
+  $('prac-month').innerHTML='<option value="">── 選擇月份 ──</option>'+
+    _pracMonthOrder.map(ym=>{
       const [y,mo]=ym.split('-');
-      const opts=byMonth[ym].map(key=>{
-        const date=key.slice(0,10);
-        const t=topics[key];
-        return `<option value="${key}">${date}${t?' · '+t:''}（${sessions[key].length} 句）</option>`;
-      }).join('');
-      return `<optgroup label="${y}年${parseInt(mo)}月">${opts}</optgroup>`;
+      const n=_pracByMonth[ym].length;
+      return `<option value="${ym}">${y}年${parseInt(mo)}月（${n} 個主題）</option>`;
     }).join('');
+  $('prac-topic-wrap').style.display='none';
+  $('prac-sel').innerHTML='<option value="">── 選擇主題 ──</option>';
+}
+
+function updatePracTopics(){
+  const ym=$('prac-month').value;
+  const wrap=$('prac-topic-wrap');
+  if(!ym){wrap.style.display='none';return;}
+  const keys=_pracByMonth[ym]||[];
+  $('prac-sel').innerHTML='<option value="">── 選擇主題 ──</option>'+
+    keys.map(key=>{
+      const date=key.slice(0,10);
+      const t=topics[key];
+      return `<option value="${key}">${date}${t?' · '+t:''}（${sessions[key].length} 句）</option>`;
+    }).join('');
+  wrap.style.display='block';
 }
 
 function startPractice(){
@@ -2001,6 +2124,10 @@ setInterval(()=>{
 
 // ── back-navigation guard ──────────────────────────
 window.addEventListener('popstate', e=>{
+  if(!$('hist-modal').classList.contains('hide')){
+    $('hist-modal').classList.add('hide');
+    return;
+  }
   const tab=e.state?.tab||'today';
   showTab(tab,null,false);
 });
