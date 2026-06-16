@@ -1681,6 +1681,11 @@ const SVG = {
 };
 const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
+function _preferredText(s){
+  if(s.alts && s.alts.length) return s.alts[s.alts.length-1].text;
+  return s.english;
+}
+
 function playAll(dateKey, loop){
   const ss=sessions[dateKey]; if(!ss||!ss.length) return;
   stopPlayback();
@@ -1702,7 +1707,7 @@ function _playAllNext(){
   if(!s){ playAllIdx++; _playAllNext(); return; }
   playId=id;
   showNowPlaying(id,playMode);
-  ttsUtter=mkUtter(s.english);
+  ttsUtter=mkUtter(_preferredText(s));
   ttsUtter.onend=()=>{
     if(playMode!=='all-once'&&playMode!=='all-loop') return;
     playAllIdx++;
