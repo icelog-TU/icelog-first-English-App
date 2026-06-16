@@ -959,6 +959,7 @@ function init(){
   const savedTab=localStorage.getItem('ui_tab')||'today';
   history.replaceState({tab:savedTab},'');
   if(savedTab!=='today'){
+    const savedModalKey=localStorage.getItem('ui_histModalKey');
     showTab(savedTab,null,false);
     if(savedTab==='practice'){
       const savedKey=localStorage.getItem('ui_practiceKey');
@@ -971,6 +972,9 @@ function init(){
         const savedScroll=parseInt(localStorage.getItem('ui_scrollY')||'0');
         if(savedScroll>0) setTimeout(()=>window.scrollTo(0,savedScroll),250);
       }
+    }
+    if(savedTab==='history' && savedModalKey && sessions[savedModalKey]){
+      openHistModal(savedModalKey);
     }
   }
 }
@@ -1051,6 +1055,7 @@ function toggleCfgSection(id){
 function openHistModal(key){
   const ss=sessions[key]; if(!ss) return;
   _currentHistModalKey=key;
+  localStorage.setItem('ui_histModalKey',key);
   ss.forEach(s=>sMap[s.id]=s);
   const date=key.slice(0,10);
   const topic=topics[key]||'（無主題）';
@@ -1065,6 +1070,7 @@ function closeHistModal(e){
   if(e && e.target!==$('hist-modal')) return;
   $('hist-modal').classList.add('hide');
   _currentHistModalKey=null;
+  localStorage.removeItem('ui_histModalKey');
 }
 
 function _rerenderHistModal(){
@@ -1982,6 +1988,11 @@ function clearToday(){
 }
 
 function showTab(name,btn,_push=true){
+  if(!$('hist-modal').classList.contains('hide')){
+    $('hist-modal').classList.add('hide');
+    _currentHistModalKey=null;
+    localStorage.removeItem('ui_histModalKey');
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   $(`page-${name}`).classList.add('on');
@@ -2243,6 +2254,8 @@ setInterval(()=>{
 window.addEventListener('popstate', e=>{
   if(!$('hist-modal').classList.contains('hide')){
     $('hist-modal').classList.add('hide');
+    _currentHistModalKey=null;
+    localStorage.removeItem('ui_histModalKey');
     return;
   }
   const tab=e.state?.tab||'today';
