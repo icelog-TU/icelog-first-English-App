@@ -1429,16 +1429,16 @@ function altsHTML(s){
     </div>`;
   }).join('');
   return `
-  <div class="alts-wrap" id="alts-${sid}">${altsCards}</div>
+  <div class="alts-wrap">${altsCards}</div>
   <div class="add-alt-wrap">
-    <button class="btn btn-ghost btn-sm" id="add-alt-btn-${sid}" onclick="showAddAlt('${sid}')">${SVG.plus}&ensp;新增翻譯</button>
-    <div class="alt-input-area" id="alt-input-area-${sid}">
-      <textarea id="alt-ta-${sid}" placeholder="輸入你覺得更適合的英文翻譯… (Ctrl+Enter 確認)"
+    <button class="btn btn-ghost btn-sm add-alt-btn" onclick="showAddAlt(this)">${SVG.plus}&ensp;新增翻譯</button>
+    <div class="alt-input-area">
+      <textarea placeholder="輸入你覺得更適合的英文翻譯… (Ctrl+Enter 確認)"
         style="min-height:64px;margin-top:6px"
-        onkeydown="if(event.key==='Enter'&&event.ctrlKey){event.preventDefault();confirmAlt('${sid}')}"></textarea>
+        onkeydown="if(event.key==='Enter'&&event.ctrlKey){event.preventDefault();confirmAlt('${sid}',this)}"></textarea>
       <div class="row" style="margin-top:6px">
-        <button class="btn btn-solid btn-sm" onclick="confirmAlt('${sid}')">${SVG.plus}&ensp;確認新增</button>
-        <button class="btn btn-ghost btn-sm" onclick="cancelAddAlt('${sid}')">取消</button>
+        <button class="btn btn-solid btn-sm" onclick="confirmAlt('${sid}',this)">${SVG.plus}&ensp;確認新增</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelAddAlt(this)">取消</button>
       </div>
     </div>
   </div>`;
@@ -1473,21 +1473,22 @@ function notesPanelHTML(id){
 }
 
 // ── alternative translations ─────────────────────────────────
-function showAddAlt(sid){
-  const btn=document.getElementById('add-alt-btn-'+sid);
-  const area=document.getElementById('alt-input-area-'+sid);
-  if(btn) btn.style.display='none';
+function showAddAlt(btn){
+  const wrap=btn.closest('.add-alt-wrap'); if(!wrap) return;
+  const area=wrap.querySelector('.alt-input-area');
+  btn.style.display='none';
   if(area){ area.classList.add('open'); area.querySelector('textarea')?.focus(); }
 }
-function cancelAddAlt(sid){
-  const btn=document.getElementById('add-alt-btn-'+sid);
-  const area=document.getElementById('alt-input-area-'+sid);
+function cancelAddAlt(btn){
+  const wrap=btn.closest('.add-alt-wrap'); if(!wrap) return;
+  const area=wrap.querySelector('.alt-input-area');
   if(area){ area.classList.remove('open'); const ta=area.querySelector('textarea'); if(ta) ta.value=''; }
-  if(btn) btn.style.display='';
+  const addBtn=wrap.querySelector('.add-alt-btn');
+  if(addBtn) addBtn.style.display='';
 }
 function _findSentence(sid){
   let s=todayData.find(x=>x.id===sid);
-  if(s) return {s, save:()=>{ sessions[today()]=todayData; localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }};
+  if(s) return {s, save:()=>{ sessions[currentSessionKey||today()]=todayData; localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }};
   for(const d of Object.keys(sessions)){
     s=sessions[d].find(x=>x.id===sid);
     if(s) return {s, save:()=>{ localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }};
@@ -1501,8 +1502,9 @@ function _rerenderActive(){
   else if(active==='page-history') renderHistory();
   else if(active==='page-notes') renderNotes();
 }
-function confirmAlt(sid){
-  const ta=document.getElementById('alt-ta-'+sid);
+function confirmAlt(sid, el){
+  const wrap=el.closest('.add-alt-wrap'); if(!wrap) return;
+  const ta=wrap.querySelector('textarea');
   const text=(ta?.value||'').trim();
   if(!text){ alert('請輸入翻譯內容'); return; }
   const found=_findSentence(sid); if(!found) return;
