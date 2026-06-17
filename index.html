@@ -715,7 +715,19 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
     <div class="hist-modal-hdr">
       <div style="flex:1;min-width:0">
         <div id="hist-modal-date" style="font-size:.62rem;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px"></div>
-        <div id="hist-modal-topic" style="font-size:1rem;color:var(--text);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+          <div id="hist-modal-topic" style="font-size:1rem;color:var(--text);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0"></div>
+          <button class="btn btn-ghost btn-sm zh-edit-btn" onclick="showEditTopic()" title="編輯主題名稱" style="flex-shrink:0">${SVG.pencil}</button>
+        </div>
+        <div id="topic-edit-area" style="display:none;margin-top:6px">
+          <div class="row" style="gap:6px">
+            <input type="text" id="topic-edit-input" placeholder="輸入主題名稱…"
+              style="flex:1;font-size:.9rem"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();confirmEditTopic()}if(event.key==='Escape'){cancelEditTopic()}">
+            <button class="btn btn-solid btn-sm" onclick="confirmEditTopic()" style="flex-shrink:0">${SVG.save}&ensp;儲存</button>
+            <button class="btn btn-ghost btn-sm" onclick="cancelEditTopic()" style="flex-shrink:0">取消</button>
+          </div>
+        </div>
       </div>
       <button onclick="closeHistModal()"
         style="flex-shrink:0;background:rgba(255,255,255,.07);border:1px solid var(--border2);
@@ -1071,14 +1083,38 @@ function openHistModal(key){
   localStorage.setItem('ui_histModalKey',key);
   ss.forEach(s=>sMap[s.id]=s);
   const date=key.slice(0,10);
-  const topic=topics[key]||'（無主題）';
+  const topic=topics[key]||'';
   $('hist-modal-date').textContent=date+'  ·  '+ss.length+' 句';
-  $('hist-modal-topic').textContent=topic;
+  $('hist-modal-topic').textContent=topic||'（無主題）';
+  $('hist-modal-topic').style.color=topic?'var(--text)':'var(--text3)';
+  $('topic-edit-area').style.display='none';
   $('hist-modal-body').innerHTML=ss.map((s,i)=>cardHTML(s,i,{showRec:true})).join('');
   $('hist-modal').classList.remove('hide');
   history.pushState({tab:'history',modal:'hist'},'');
 }
 
+function showEditTopic(){
+  const cur=topics[_currentHistModalKey]||'';
+  $('topic-edit-input').value=cur;
+  $('topic-edit-area').style.display='block';
+  $('topic-edit-input').focus();
+  $('topic-edit-input').select();
+}
+function cancelEditTopic(){
+  $('topic-edit-area').style.display='none';
+}
+function confirmEditTopic(){
+  const key=_currentHistModalKey; if(!key) return;
+  const newTopic=$('topic-edit-input').value.trim();
+  if(newTopic) topics[key]=newTopic;
+  else delete topics[key];
+  localStorage.setItem('eng_topics',JSON.stringify(topics));
+  gistPushDebounced();
+  $('hist-modal-topic').textContent=newTopic||'（無主題）';
+  $('hist-modal-topic').style.color=newTopic?'var(--text)':'var(--text3)';
+  $('topic-edit-area').style.display='none';
+  renderHistory();
+}
 function closeHistModal(e){
   if(e && e.target!==$('hist-modal')) return;
   $('hist-modal').classList.add('hide');
