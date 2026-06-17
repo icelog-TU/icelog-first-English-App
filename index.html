@@ -2593,12 +2593,23 @@ function startPractice(){
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">${SVG.eye}&ensp;顯示答案</button>
         <button class="btn btn-solid btn-sm ai-check-btn" onclick="aiCheck('${s.id}',this)">${SVG.bot}&ensp;AI 批改</button>
         <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" data-prefer="1" title="聽正確發音">${SVG.play} 播放</button>
+        <button class="btn btn-ghost btn-sm" onclick="togglePracRef('${s.id}')" id="prac-ref-btn-${s.id}">${SVG.bookA}&ensp;翻譯與筆記</button>
       </div>
       <div class="answer">✅&ensp;${esc(_preferredText(s))}</div>
       <div class="ai-fb" id="ai-fb-${s.id}"></div>
+      <div id="prac-ref-${s.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="lbl" style="margin-bottom:5px">APP 翻譯</div>
+        <div style="font-size:.9rem;color:var(--text2);line-height:1.65;margin-bottom:10px">${wordify(s.english)}</div>
+        ${(s.alts||[]).map((a,ai)=>`<div class="lbl" style="margin-bottom:5px">我的翻譯${(s.alts||[]).length>1?' '+(ai+1):''}</div><div style="font-size:.9rem;color:var(--g2);line-height:1.65;margin-bottom:10px">${wordify(a.text)}</div>`).join('')}
+        ${highlights[s.id]?.note?`<div class="lbl" style="margin-bottom:5px">我的筆記</div><div style="font-size:.88rem;color:var(--text2);line-height:1.7;white-space:pre-wrap">${esc(highlights[s.id].note)}</div>`:''}
+      </div>
     </div>`).join('');
 }
 
+function togglePracRef(id){
+  const el=$('prac-ref-'+id); if(!el) return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
 function clearPracInput(id){
   const input=$('prac-in-'+id);
   const dispEl=$('prac-disp-'+id);
