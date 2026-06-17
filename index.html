@@ -297,6 +297,16 @@ select option{background:var(--bg2);color:var(--text)}
 .notes-month-btn:hover{color:var(--text)}
 .notes-month-body{display:none;margin-bottom:8px}
 .notes-month-body.open{display:block}
+.notes-topic-btn{
+  width:100%;text-align:left;padding:11px 18px 11px 28px;
+  background:transparent;border:none;border-top:1px solid var(--border);border-radius:0;
+  cursor:pointer;margin-bottom:0;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.85rem;color:var(--text2);transition:.2s;font-family:inherit;font-weight:300;
+}
+.notes-topic-btn:hover{color:var(--text)}
+.notes-topic-body{display:none;margin-bottom:4px}
+.notes-topic-body.open{display:block}
 
 .month-hdr{
   width:100%;text-align:left;padding:12px 18px;
@@ -1807,32 +1817,52 @@ function renderNotes(){
     $('notes-list').innerHTML=`<div class="empty">${SVG.star}<br>還沒有標記任何重點<br><span style="font-size:.82rem">點句子右上角的星星按鈕來標記重點句子</span></div>`;
     return;
   }
-  const byMonth={};
+  // group: month → sessionKey → items
+  const byMonthTopic={};
   ids.forEach(id=>{
     const h=highlights[id];
-    const ym=(h.date||'').slice(0,7);
-    if(!byMonth[ym]) byMonth[ym]=[];
-    byMonth[ym].push({id,...h});
+    const sessionKey=Object.keys(sessions).find(k=>sessions[k].some(s=>s.id===id))||(h.date||'').slice(0,10);
+    const ym=(sessionKey||'').slice(0,7);
+    if(!byMonthTopic[ym]) byMonthTopic[ym]={};
+    if(!byMonthTopic[ym][sessionKey]) byMonthTopic[ym][sessionKey]=[];
+    byMonthTopic[ym][sessionKey].push({id,...h});
   });
-  const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+  const months=Object.keys(byMonthTopic).sort((a,b)=>b.localeCompare(a));
   const collapseBar=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
     <button class="btn btn-ghost btn-sm" onclick="collapseNotesAll()">${SVG.chevronsUp}&ensp;收起全部</button>
   </div>`;
-  $('notes-list').innerHTML=collapseBar+months.map((ym,idx)=>{
+  $('notes-list').innerHTML=collapseBar+months.map((ym,mIdx)=>{
     const [y,mo]=ym.split('-');
-    const items=byMonth[ym];
-    const isFirst=idx===0;
+    const topicMap=byMonthTopic[ym];
+    const topicKeys=Object.keys(topicMap).sort((a,b)=>b.localeCompare(a));
+    const total=topicKeys.reduce((n,k)=>n+topicMap[k].length,0);
+    const isFirstM=mIdx===0;
+    const topicsHTML=topicKeys.map((tKey,tIdx)=>{
+      const items=topicMap[tKey];
+      const tName=topics[tKey]||'（無主題）';
+      const tColor=topics[tKey]?'var(--text2)':'var(--text3)';
+      const isFirstT=isFirstM&&tIdx===0;
+      const safeKey=tKey.replace(/'/g,"\\'");
+      return `
+      <button class="notes-topic-btn${isFirstT?' open':''}" id="notes-tbtn-${tKey}" onclick="toggleNotesTopic('${safeKey}')">
+        <span style="color:${tColor}">${esc(tName)}</span>
+        <span class="badge">${items.length} 個重點</span>
+      </button>
+      <div class="notes-topic-body${isFirstT?' open':''}" id="notes-tbody-${tKey}">
+        ${items.map(h=>{
+          const fullS=sessions[tKey]?.find(s=>s.id===h.id)||{id:h.id,chinese:h.chinese,english:h.english};
+          sMap[fullS.id]=fullS;
+          return cardHTML(fullS,0,{numLabel:SVG.star+'&ensp;重點',showRec:false});
+        }).join('')}
+      </div>`;
+    }).join('');
     return `
-    <button class="notes-month-btn${isFirst?' open':''}" id="notes-mbtn-${ym}" onclick="toggleNotesMonth('${ym}')">
+    <button class="notes-month-btn${isFirstM?' open':''}" id="notes-mbtn-${ym}" onclick="toggleNotesMonth('${ym}')">
       <span>${y}年${parseInt(mo)}月</span>
-      <span style="display:flex;align-items:center;gap:8px"><span class="badge">${items.length} 個重點</span><span id="notes-marr-${ym}">${isFirst?'▲':'▼'}</span></span>
+      <span style="display:flex;align-items:center;gap:8px"><span class="badge">${total} 個重點</span><span id="notes-marr-${ym}">${isFirstM?'▲':'▼'}</span></span>
     </button>
-    <div class="notes-month-body${isFirst?' open':''}" id="notes-mbody-${ym}">
-      ${items.map(h=>{
-        sMap[h.id]={id:h.id,chinese:h.chinese,english:h.english};
-        return cardHTML({id:h.id,chinese:h.chinese,english:h.english},0,
-          {numLabel:SVG.star+'&ensp;重點',showRec:false});
-      }).join('')}
+    <div class="notes-month-body${isFirstM?' open':''}" id="notes-mbody-${ym}">
+      ${topicsHTML}
     </div>`;
   }).join('');
 }
@@ -1843,8 +1873,11 @@ function toggleNotesMonth(ym){
   btn.classList.toggle('open',open);
   const arr=$(`notes-marr-${ym}`); if(arr) arr.textContent=open?'▲':'▼';
 }
+function toggleNotesTopic(key){
+  $(`notes-tbody-${key}`)?.classList.toggle('open');
+}
 function collapseNotesAll(){
-  document.querySelectorAll('.notes-month-body').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.notes-month-body,.notes-topic-body').forEach(el=>el.classList.remove('open'));
   document.querySelectorAll('.notes-month-btn').forEach(el=>el.classList.remove('open'));
   document.querySelectorAll('[id^="notes-marr-"]').forEach(el=>el.textContent='▼');
 }
