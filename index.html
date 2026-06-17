@@ -2584,7 +2584,11 @@ function startPractice(){
       <div class="zh" style="font-size:.97rem;font-weight:400;color:var(--text)"><span class="lang-tag">TW</span>&ensp;${esc(s.chinese)}</div>
       <input type="text" id="prac-in-${s.id}" placeholder="試著翻譯成英文…"
         style="margin-top:10px"
-        onkeydown="if(event.key==='Enter')aiCheck('${s.id}',this.parentElement.querySelector('.ai-check-btn'))">
+        onkeydown="if(event.key==='Enter')aiCheck('${s.id}',this.closest('.p-card').querySelector('.ai-check-btn'))">
+      <div id="prac-disp-${s.id}" style="display:none;margin-top:10px;padding:9px 12px;background:rgba(255,255,255,.04);border-radius:2px;font-size:.92rem;color:var(--text);line-height:1.65;word-break:break-word;position:relative;padding-right:34px">
+        <span id="prac-disp-txt-${s.id}"></span>
+        <button onclick="clearPracInput('${s.id}')" title="重新輸入" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:.8rem;padding:2px 5px;line-height:1;transition:.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text3)'">✕</button>
+      </div>
       <div class="acts" style="margin-top:9px">
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.p-card').querySelector('.answer').classList.toggle('show')">${SVG.eye}&ensp;顯示答案</button>
         <button class="btn btn-solid btn-sm ai-check-btn" onclick="aiCheck('${s.id}',this)">${SVG.bot}&ensp;AI 批改</button>
@@ -2595,6 +2599,12 @@ function startPractice(){
     </div>`).join('');
 }
 
+function clearPracInput(id){
+  const input=$('prac-in-'+id);
+  const dispEl=$('prac-disp-'+id);
+  if(dispEl) dispEl.style.display='none';
+  if(input){input.style.display='';input.focus();}
+}
 async function aiCheck(id, btn){
   const s=sMap[id]; if(!s) return;
   const key=localStorage.getItem('anthropic_key');
@@ -2602,6 +2612,10 @@ async function aiCheck(id, btn){
   const input=document.getElementById('prac-in-'+id);
   const userAns=(input?.value||'').trim();
   if(!userAns){alert('請先輸入你的翻譯答案');return;}
+  const dispEl=$('prac-disp-'+id); const dispTxt=$('prac-disp-txt-'+id);
+  if(dispTxt) dispTxt.textContent=userAns;
+  if(input) input.style.display='none';
+  if(dispEl) dispEl.style.display='block';
   const fbEl=document.getElementById('ai-fb-'+id);
   if(!fbEl) return;
   fbEl.innerHTML='<span style="opacity:.5">AI 正在評估中…</span>';
