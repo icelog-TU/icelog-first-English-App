@@ -1930,7 +1930,10 @@ function _oaiSetBtn(id, mode, state){
 }
 function _stopOAI(){
   if(_oaiTimer){ clearTimeout(_oaiTimer); _oaiTimer=null; }
-  if(_oaiAudio){ _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null; }
+  if(_oaiAudio){
+    _oaiAudio.onerror=null; _oaiAudio.onended=null;
+    _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null;
+  }
   const prev=_oaiId; const prevMode=_oaiMode;
   _oaiId=null; _oaiMode=null;
   if(prev&&prevMode){ _oaiSetBtn(prev,prevMode,'idle'); hideNowPlaying(); }
