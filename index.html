@@ -896,6 +896,9 @@ let _pendingSaveDate  = null;
 let _currentHistModalKey = null;
 let _recAudio = null;
 let _recPlayingId = null;
+let _oaiAudio = null;
+let _oaiLoopId = null;
+let _oaiBlobUrl = null;
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllAltIdx = 0;
@@ -1471,6 +1474,7 @@ function cardHTML(s,i,opts){
         <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">${SVG.play} 一次</button>
         <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">${SVG.repeat} 循環</button>
         <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">${SVG.headphones} 跟讀</button>
+        <button class="icon-btn play-btn" data-oai="${s.id}" title="OpenAI 自然語音循環播放">✦&ensp;AI 循環</button>
       </div>
       ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}">${recordings[s.id]?`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${s.id}')">播放錄音</button></span>`:''}</span>`:''}
     </div>
@@ -1755,6 +1759,8 @@ document.addEventListener('click', e=>{
   if(rc){ toggleRec(rc.dataset.rec); return; }
   const wd=e.target.closest('.w');
   if(wd){ lookupWord(wd.dataset.word); return; }
+  const oai=e.target.closest('[data-oai]');
+  if(oai){ playOAI(oai.dataset.oai); return; }
 });
 
 // ── SVG icons ──
@@ -1835,7 +1841,56 @@ function _playAllNext(){
   speechSynthesis.speak(ttsUtter);
 }
 
+// ── OpenAI TTS loop ──────────────────────────────────────────
+async function _oaiTTSFetch(text){
+  const key=localStorage.getItem('anthropic_key');
+  if(!key){ alert('請先在設定頁面輸入 OpenAI API Key'); throw new Error('no key'); }
+  const res=await fetch('https://api.openai.com/v1/audio/speech',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:'tts-1-hd',input:text,voice:'nova'})
+  });
+  if(!res.ok){ let msg=res.status; try{const e=await res.json();msg=e.error?.message||msg;}catch(x){} throw new Error(msg); }
+  return URL.createObjectURL(await res.blob());
+}
+function _oaiSetBtn(id, state){
+  document.querySelectorAll(`[data-oai="${id}"]`).forEach(b=>{
+    if(state==='loading'){ b.innerHTML='⏳ 載入…'; b.disabled=true; b.style.color=''; b.classList.remove('p-active'); }
+    else if(state==='playing'){ b.innerHTML=SVG.stop+'&ensp;停止'; b.disabled=false; b.style.color='var(--red)'; b.classList.add('p-active'); }
+    else { b.innerHTML='✦&ensp;AI 循環'; b.disabled=false; b.style.color=''; b.classList.remove('p-active'); }
+  });
+}
+function _stopOAI(){
+  if(_oaiAudio){ _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null; }
+  if(_oaiBlobUrl){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; }
+  const prev=_oaiLoopId; _oaiLoopId=null;
+  if(prev) _oaiSetBtn(prev,'idle');
+}
+async function playOAI(id){
+  if(_oaiLoopId===id){ _stopOAI(); return; }
+  speechSynthesis.cancel(); // stop regular TTS
+  if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
+  ttsUtter=null; playId=null; playMode=null;
+  _stopOAI();
+  const s=sMap[id]; if(!s) return;
+  const text=_preferredText(s);
+  _oaiLoopId=id;
+  _oaiSetBtn(id,'loading');
+  try{
+    _oaiBlobUrl=await _oaiTTSFetch(text);
+    if(_oaiLoopId!==id){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; return; }
+    _oaiAudio=new Audio(_oaiBlobUrl);
+    _oaiAudio.loop=true;
+    _oaiAudio.onerror=()=>_stopOAI();
+    await _oaiAudio.play();
+    _oaiSetBtn(id,'playing');
+  }catch(e){
+    _stopOAI();
+    if(e.message!=='no key') alert('OpenAI 語音錯誤：'+e.message);
+  }
+}
 function stopPlayback(){
+  _stopOAI();
   speechSynthesis.cancel();
   if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
   ttsUtter=null;
