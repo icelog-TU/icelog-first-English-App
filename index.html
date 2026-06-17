@@ -2202,6 +2202,12 @@ function playShadow(id,text){
 async function toggleRec(id){
   if(recFor===id && recorder?.state==='recording'){ recorder.stop(); return; }
   if(recorder?.state==='recording') recorder.stop();
+  // 停止 OAI 音檔，釋放音訊 session，讓裝置可以切換為錄音模式
+  if(_oaiAudio){
+    _oaiAudio.onerror=null; _oaiAudio.onended=null;
+    _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio.load(); _oaiAudio=null;
+  }
+  await new Promise(r=>setTimeout(r,120));
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
     recChunks=[];recFor=id;
@@ -2230,8 +2236,15 @@ async function toggleRec(id){
     recorder.start();
     const rb=$(`rb-${id}`);
     if(rb){rb.classList.add('rec-on');rb.innerHTML=SVG.pause;}
-  }catch{
-    alert('無法存取麥克風，請確認瀏覽器已允許麥克風權限。');
+  }catch(e){
+    const name=e?.name||'';
+    if(name==='NotAllowedError'||name==='PermissionDeniedError'){
+      alert('麥克風權限被拒絕。\n\n請到手機「設定」→ 瀏覽器（Safari/Chrome）→ 麥克風，允許此網站使用麥克風後再試一次。');
+    } else if(name==='NotFoundError'){
+      alert('找不到麥克風裝置，請確認裝置有麥克風並且已連接。');
+    } else {
+      alert('無法存取麥克風：' + (e?.message||name||'未知錯誤') + '\n\n請確認瀏覽器已允許此網站使用麥克風權限。');
+    }
   }
 }
 function playRec(id){
