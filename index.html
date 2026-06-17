@@ -1474,8 +1474,8 @@ function cardHTML(s,i,opts){
     <div class="acts">
       <div class="play-grp">
         <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="播放一次">${SVG.play}&ensp;一次</button>
-        <button class="icon-btn play-btn" data-oai="${s.id}" data-oai-mode="loop" title="OpenAI 自然語音循環">${SVG.repeat}&ensp;AI 循環</button>
-        <button class="icon-btn play-btn" data-oai="${s.id}" data-oai-mode="shadow" title="OpenAI 自然語音跟讀">${SVG.headphones}&ensp;AI 跟讀</button>
+        <button class="icon-btn play-btn" data-oai="${s.id}" data-oai-mode="loop" title="OpenAI 自然語音循環">${SVG.repeat}&ensp;循環</button>
+        <button class="icon-btn play-btn" data-oai="${s.id}" data-oai-mode="shadow" title="OpenAI 自然語音跟讀">${SVG.headphones}&ensp;跟讀</button>
       </div>
       ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}">${recordings[s.id]?`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${s.id}')">播放錄音</button></span>`:''}</span>`:''}
     </div>
@@ -1856,7 +1856,7 @@ async function _oaiTTSFetch(text){
   return URL.createObjectURL(await res.blob());
 }
 function _oaiSetBtn(id, mode, state){
-  const idleLabel=mode==='loop'?(SVG.repeat+'&ensp;AI 循環'):(SVG.headphones+'&ensp;AI 跟讀');
+  const idleLabel=mode==='loop'?(SVG.repeat+'&ensp;循環'):(SVG.headphones+'&ensp;跟讀');
   document.querySelectorAll(`[data-oai="${id}"][data-oai-mode="${mode}"]`).forEach(b=>{
     if(state==='loading'){ b.innerHTML=SVG.hourglass+'&ensp;載入…'; b.disabled=true; b.style.color=''; b.classList.remove('p-active'); }
     else if(state==='playing'){ b.innerHTML=SVG.stop+'&ensp;停止'; b.disabled=false; b.style.color='var(--red)'; b.classList.add('p-active'); }
