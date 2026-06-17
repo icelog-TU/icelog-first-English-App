@@ -747,8 +747,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
     <h2>儲存<span class="grad-text">方式</span></h2>
     <p id="save-choice-msg" style="margin:16px 0 22px;line-height:1.7"></p>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-solid" style="justify-content:center;padding:13px" onclick="_saveChoiceOverwrite()">覆蓋現有主題</button>
-      <button class="btn btn-primary" style="justify-content:center;padding:13px" onclick="_saveChoiceNew()">另存為新主題</button>
+      <button class="btn btn-primary" style="justify-content:center;padding:13px" onclick="_saveChoiceNew()">另存為新主題（建議）</button>
+      <button class="btn btn-ghost" style="justify-content:center;padding:13px;color:var(--red);border-color:rgba(228,76,101,.3)" onclick="_saveChoiceOverwrite()">覆蓋現有主題（無法復原）</button>
       <button class="btn btn-ghost" style="justify-content:center" onclick="hideModal('save-choice-modal')">取消</button>
     </div>
   </div>
@@ -2062,15 +2062,18 @@ function saveSession(){
   if(!todayData.length) return;
   const date = $('session-date').value || today();
 
-  if(currentSessionKey && freshTranslation){
-    // Freshly translated + existing session → ask user
-    _pendingSaveDate = date;
-    const existingTopic = topics[currentSessionKey];
-    $('save-choice-msg').textContent = existingTopic
-      ? `這個日期已有「${existingTopic}」的記錄，要覆蓋它，還是另開新主題儲存？`
-      : '這個日期已有學習記錄，要覆蓋它，還是另開新主題儲存？';
-    $('save-choice-modal').classList.remove('hide');
-    return;
+  if(currentSessionKey){
+    const stored=sessions[currentSessionKey];
+    const isNewData=!stored||todayData.length!==stored.length||todayData[0]?.id!==stored[0]?.id;
+    if(isNewData){
+      _pendingSaveDate = date;
+      const existingTopic = topics[currentSessionKey];
+      $('save-choice-msg').textContent = existingTopic
+        ? `這個日期已有「${existingTopic}」的記錄，要覆蓋它，還是另開新主題儲存？`
+        : '這個日期已有學習記錄，要覆蓋它，還是另開新主題儲存？';
+      $('save-choice-modal').classList.remove('hide');
+      return;
+    }
   }
 
   _doSave(date, currentSessionKey || _nextKeyForDate(date));
