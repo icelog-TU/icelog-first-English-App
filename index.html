@@ -1452,6 +1452,9 @@ function cardHTML(s,i,opts){
         onclick="toggleHighlight('${s.id}')" title="${hl?'取消標記':'標記為重點'}">${hl?SVG.starFull:SVG.star}</button>
     </div>
     <div class="zh"><span class="lang-tag">TW</span>&ensp;${esc(s.chinese)}</div>
+    <div style="text-align:right;margin:-2px 0 4px">
+      <button class="btn btn-ghost btn-sm zh-edit-btn" onclick="showEditZh(this)" title="改寫原句中文">${SVG.pencil}</button>
+    </div>
     <div class="zh-edit-area" data-sid="${s.id}">
       <textarea style="min-height:54px;margin-top:0" placeholder="改寫中文原句（Ctrl+Enter 確認）"
         onkeydown="if(event.key==='Enter'&&event.ctrlKey){event.preventDefault();confirmEditZh('${s.id}',this)}">${esc(s.chinese)}</textarea>
@@ -1468,7 +1471,6 @@ function cardHTML(s,i,opts){
         <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">${SVG.headphones} 跟讀</button>
       </div>
       ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}">${recordings[s.id]?`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${s.id}')">播放錄音</button></span>`:''}</span>`:''}
-      <button class="btn btn-ghost btn-sm zh-edit-btn" onclick="showEditZh(this)" title="改寫原句中文">${SVG.pencil}</button>
     </div>
     ${altsHTML(s)}
     ${hl?notesPanelHTML(s.id):''}
