@@ -929,7 +929,6 @@ let _recPlayingId = null;
 let _oaiAudio = null;
 let _oaiId = null;
 let _oaiMode = null;
-let _oaiBlobUrl = null;
 let _oaiTimer = null;
 const _oaiCache = new Map();
 let playAllList = [];
@@ -1932,7 +1931,6 @@ function _oaiSetBtn(id, mode, state){
 function _stopOAI(){
   if(_oaiTimer){ clearTimeout(_oaiTimer); _oaiTimer=null; }
   if(_oaiAudio){ _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null; }
-  _oaiBlobUrl=null;
   const prev=_oaiId; const prevMode=_oaiMode;
   _oaiId=null; _oaiMode=null;
   if(prev&&prevMode){ _oaiSetBtn(prev,prevMode,'idle'); hideNowPlaying(); }
@@ -1946,7 +1944,9 @@ function clearOAICache(){
 }
 function _oaiPlayAudio(id){
   if(_oaiId!==id) return;
-  const audio=new Audio(_oaiBlobUrl);
+  const url=_oaiCache.get(id);
+  if(!url){ _stopOAI(); return; }
+  const audio=new Audio(url);
   _oaiAudio=audio;
   audio.onerror=()=>_stopOAI();
   if(_oaiMode==='once'){
@@ -1978,12 +1978,12 @@ async function playOAI(id, mode){
   ttsUtter=null; playId=null; playMode=null;
   _stopOAI();
   const s=sMap[id]; if(!s) return;
-  const text=_preferredText(s);
+  const text=s.english; // play exactly what the card shows, not the preferred alt
   _oaiId=id; _oaiMode=mode;
   _oaiSetBtn(id,mode,'loading');
   try{
-    _oaiBlobUrl=await _oaiTTSFetch(id, text);
-    if(_oaiId!==id||_oaiMode!==mode){ _oaiBlobUrl=null; return; }
+    await _oaiTTSFetch(id, text);
+    if(_oaiId!==id||_oaiMode!==mode){ return; }
     _oaiPlayAudio(id);
   }catch(e){
     _stopOAI();
