@@ -332,6 +332,7 @@ select option{background:var(--bg2);color:var(--text)}
 }
 
 /* ── history detail modal ── */
+#hist-modal-body .s-card{border-left:none;border-right:none;border-radius:0;margin-bottom:1px}
 #hist-modal-inner{
   background:var(--bg2);border:1px solid var(--border2);border-radius:2px;
   width:min(640px,96vw);max-height:92svh;overflow-y:auto;
@@ -736,7 +737,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
         onmouseover="this.style.background='rgba(228,76,101,.25)'"
         onmouseout="this.style.background='rgba(255,255,255,.07)'">✕</button>
     </div>
-    <div id="hist-modal-body" style="padding:20px"></div>
+    <div id="hist-modal-body" style="padding:16px 0"></div>
   </div>
 </div>
 
