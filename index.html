@@ -1728,9 +1728,11 @@ function renderNotes(){
   </div>`;
   $('notes-list').innerHTML=collapseBar+dates.map(d=>{
     const items=byDate[d];
+    const _noteDate=d.slice(0,10);
+    const _noteTopic=topics[d]?`&ensp;<span style="color:var(--text2);font-weight:400">${esc(topics[d])}</span>`:'';
     return `
     <button class="hist-btn" onclick="toggleHist('notes-${d}')">
-      <span>${SVG.calDays}&ensp;${d}</span>
+      <span>${SVG.calDays}&ensp;${_noteDate}${_noteTopic}</span>
       <span class="badge">${items.length} 個重點</span>
     </button>
     <div class="hist-detail" id="hd-notes-${d}">
