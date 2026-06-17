@@ -931,6 +931,10 @@ let _oaiId = null;
 let _oaiMode = null;
 let _oaiTimer = null;
 const _oaiCache = new Map();
+let _topicShadowKey = null;
+let _topicShadowList = [];
+let _topicShadowIdx = 0;
+let _topicShadowTimer = null;
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllAltIdx = 0;
@@ -1930,13 +1934,17 @@ function _oaiSetBtn(id, mode, state){
 }
 function _stopOAI(){
   if(_oaiTimer){ clearTimeout(_oaiTimer); _oaiTimer=null; }
+  if(_topicShadowTimer){ clearTimeout(_topicShadowTimer); _topicShadowTimer=null; }
   if(_oaiAudio){
     _oaiAudio.onerror=null; _oaiAudio.onended=null;
     _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null;
   }
   const prev=_oaiId; const prevMode=_oaiMode;
+  const prevTopicKey=_topicShadowKey;
   _oaiId=null; _oaiMode=null;
+  _topicShadowKey=null; _topicShadowList=[]; _topicShadowIdx=0;
   if(prev&&prevMode){ _oaiSetBtn(prev,prevMode,'idle'); hideNowPlaying(); }
+  else if(prevTopicKey){ _setTopicShadowBtn(prevTopicKey,'idle'); hideNowPlaying(); }
 }
 function clearOAICache(){
   _stopOAI();
@@ -1993,6 +2001,63 @@ async function playOAI(id, mode){
     if(e.message!=='no key') alert('OpenAI 語音錯誤：'+e.message);
   }
 }
+// ── Topic shadow loop (AI 跟讀循環整個主題) ──────────────────
+function _setTopicShadowBtn(key, state){
+  const btn=$(`tshadow-btn-${key}`);
+  if(!btn) return;
+  if(state==='playing'){
+    btn.innerHTML=SVG.stop+'&ensp;停止';
+    btn.style.color='var(--red)'; btn.style.borderColor='rgba(228,76,101,.3)';
+  } else {
+    btn.innerHTML=SVG.headphones+'&ensp;跟讀循環';
+    btn.style.color=''; btn.style.borderColor='';
+  }
+}
+async function playTopicShadow(key){
+  if(_topicShadowKey===key){ _stopOAI(); return; }
+  speechSynthesis.cancel();
+  if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
+  ttsUtter=null; playId=null; playMode=null;
+  _stopOAI();
+  const ss=sessions[key]; if(!ss||!ss.length) return;
+  ss.forEach(s=>sMap[s.id]=s);
+  _topicShadowKey=key;
+  _topicShadowList=ss.map(s=>s.id);
+  _topicShadowIdx=0;
+  _setTopicShadowBtn(key,'playing');
+  await _topicShadowNext();
+}
+async function _topicShadowNext(){
+  if(!_topicShadowKey) return;
+  const id=_topicShadowList[_topicShadowIdx];
+  const s=sMap[id]; if(!s){ _stopOAI(); return; }
+  try{
+    await _oaiTTSFetch(id, s.english);
+    if(!_topicShadowKey) return;
+    const url=_oaiCache.get(id); if(!url){ _stopOAI(); return; }
+    const audio=new Audio(url);
+    _oaiAudio=audio;
+    showNowPlaying(id,'topic-shadow');
+    audio.onerror=()=>{ if(_oaiAudio===audio) _stopOAI(); };
+    audio.onended=()=>{
+      if(_oaiAudio!==audio) return;
+      _oaiAudio=null;
+      if(!_topicShadowKey) return;
+      const dur=(audio.duration||2)*1000;
+      $('np-mode').innerHTML=SVG.mic+'&ensp;跟讀中';
+      _topicShadowTimer=setTimeout(()=>{
+        if(!_topicShadowKey) return;
+        _topicShadowIdx=(_topicShadowIdx+1)%_topicShadowList.length;
+        _topicShadowNext();
+      }, dur);
+    };
+    audio.play().catch(()=>_stopOAI());
+  }catch(e){
+    _stopOAI();
+    if(e.message!=='no key') alert('OpenAI 語音錯誤：'+e.message);
+  }
+}
+
 function stopPlayback(){
   _stopOAI();
   speechSynthesis.cancel();
@@ -2021,9 +2086,11 @@ function showNowPlaying(id, mode){
       if(i>=0){ num=i+1; break; }
     }
   }
-  const modeLabel={once:SVG.play+' 播放',loop:SVG.repeat+' 循環',shadow:SVG.headphones+' 跟讀','all-once':SVG.play+' 全部','all-loop':SVG.repeat+' 全部循環'}[mode]||mode;
+  const modeLabel={once:SVG.play+' 播放',loop:SVG.repeat+' 循環',shadow:SVG.headphones+' 跟讀','topic-shadow':SVG.headphones+' 跟讀循環','all-once':SVG.play+' 全部','all-loop':SVG.repeat+' 全部循環'}[mode]||mode;
   $('np-mode').innerHTML=modeLabel;
-  $('np-num').textContent = playAllList.length>1 ? `${playAllIdx+1} / ${playAllList.length}` : `第 ${num} 句`;
+  $('np-num').textContent = _topicShadowKey
+    ? `${_topicShadowIdx+1} / ${_topicShadowList.length}`
+    : (playAllList.length>1 ? `${playAllIdx+1} / ${playAllList.length}` : `第 ${num} 句`);
   $('np-zh').textContent=s.chinese;
   $('now-playing').style.display='flex';
   requestAnimationFrame(()=>{
@@ -2346,9 +2413,10 @@ function renderHistory(){
             <span style="color:${tColor};font-size:.88rem;font-weight:300">${tLabel}</span>
             <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
           </button>
-          <div style="display:flex;gap:5px;padding-bottom:2px">
+          <div style="display:flex;gap:5px;padding-bottom:2px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',false)">${SVG.play}&ensp;播放</button>
             <button class="btn btn-ghost btn-sm" onclick="playAll('${key}',true)">${SVG.repeat}&ensp;循環</button>
+            <button class="btn btn-ghost btn-sm" id="tshadow-btn-${key}" onclick="playTopicShadow('${key}')" ${_topicShadowKey===key?'style="color:var(--red);border-color:rgba(228,76,101,.3)"':''}>${_topicShadowKey===key?SVG.stop+'&ensp;停止':SVG.headphones+'&ensp;跟讀循環'}</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
           </div>
         </div>`;
