@@ -2396,6 +2396,7 @@ function showTab(name,btn,_push=true){
       const _ym=_latestKey.slice(0,7), _date=_latestKey.slice(0,10);
       const mb=$(`mb-${_ym}`); if(mb){ mb.classList.add('open'); const arr=$(`marr-${_ym}`); if(arr) arr.textContent='▲'; }
       $(`hd-date-${_date}`)?.classList.add('open');
+      $(`hb-date-${_date}`)?.classList.add('open');
     }
   }
   if(name==='practice') renderPracticeOpts();
