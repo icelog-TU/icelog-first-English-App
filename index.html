@@ -251,7 +251,12 @@ select option{background:var(--bg2);color:var(--text)}
   font-size:.62rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;
   color:var(--text3);margin-bottom:8px;
 }
-.zh{font-size:.9rem;color:var(--text2);margin-bottom:6px;font-weight:300}
+.zh{font-size:.9rem;color:var(--text2);margin-bottom:6px;font-weight:300;display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.zh-text{flex:1}
+.zh-edit-btn{padding:1px 5px!important;font-size:.6rem!important;opacity:.35;flex-shrink:0;margin-top:-1px;transition:opacity .15s}
+.zh-edit-btn:hover{opacity:.8!important}
+.zh-edit-area{display:none;margin-bottom:6px}
+.zh-edit-area.open{display:block}
 .en{font-size:1rem;font-weight:300;color:var(--text);line-height:1.7;margin-bottom:12px}
 .en .w{
   cursor:pointer;
@@ -1409,7 +1414,18 @@ function cardHTML(s,i,opts){
       <button class="hl-btn${hl?' on':''}" id="hlbtn-${s.id}"
         onclick="toggleHighlight('${s.id}')" title="${hl?'取消標記':'標記為重點'}">${hl?SVG.starFull:SVG.star}</button>
     </div>
-    <div class="zh"><span class="lang-tag">TW</span>&ensp;${esc(s.chinese)}</div>
+    <div class="zh">
+      <span class="zh-text"><span class="lang-tag">TW</span>&ensp;${esc(s.chinese)}</span>
+      <button class="btn btn-ghost btn-sm zh-edit-btn" onclick="showEditZh(this)" title="改寫原句中文">${SVG.pencil}</button>
+    </div>
+    <div class="zh-edit-area" data-sid="${s.id}">
+      <textarea style="min-height:54px;margin-top:0" placeholder="改寫中文原句（Ctrl+Enter 確認）"
+        onkeydown="if(event.key==='Enter'&&event.ctrlKey){event.preventDefault();confirmEditZh('${s.id}',this)}">${esc(s.chinese)}</textarea>
+      <div class="row" style="margin-top:6px">
+        <button class="btn btn-solid btn-sm" onclick="confirmEditZh('${s.id}',this)">${SVG.save}&ensp;儲存</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelEditZh(this)">取消</button>
+      </div>
+    </div>
     <div class="en"><span class="lang-tag">US</span>&ensp;${wordify(s.english)}</div>
     <div class="acts">
       <div class="play-grp">
@@ -1505,6 +1521,33 @@ function cancelAddAlt(btn){
   if(area){ area.classList.remove('open'); const ta=area.querySelector('textarea'); if(ta) ta.value=''; }
   const addBtn=wrap.querySelector('.add-alt-btn');
   if(addBtn) addBtn.style.display='';
+}
+function showEditZh(btn){
+  const wrap=btn.closest('.s-card'); if(!wrap) return;
+  const area=wrap.querySelector('.zh-edit-area');
+  const ta=area?.querySelector('textarea'); if(!ta) return;
+  const sid=area.dataset.sid;
+  if(sid && sMap[sid]) ta.value=sMap[sid].chinese;
+  area.classList.add('open');
+  ta.focus(); ta.selectionStart=ta.selectionEnd=ta.value.length;
+}
+function cancelEditZh(btn){
+  const wrap=btn.closest('.s-card'); if(!wrap) return;
+  const area=wrap.querySelector('.zh-edit-area');
+  const ta=area?.querySelector('textarea');
+  const sid=area?.dataset.sid;
+  if(ta && sid && sMap[sid]) ta.value=sMap[sid].chinese;
+  area?.classList.remove('open');
+}
+function confirmEditZh(sid, el){
+  const wrap=el.closest('.s-card'); if(!wrap) return;
+  const ta=wrap.querySelector('.zh-edit-area textarea');
+  const newZh=(ta?.value||'').trim();
+  if(!newZh){ alert('請輸入中文內容'); return; }
+  const found=_findSentence(sid); if(!found) return;
+  found.s.chinese=newZh;
+  found.save();
+  _rerenderActive();
 }
 function _findSentence(sid){
   let s=todayData.find(x=>x.id===sid);
