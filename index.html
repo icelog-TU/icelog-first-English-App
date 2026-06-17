@@ -1848,11 +1848,12 @@ function stopPlayback(){
 function showNowPlaying(id, mode){
   const s=sMap[id]; if(!s) return;
   let num='?';
-  const ti=todayData.findIndex(x=>x.id===id);
+  const _matchId=x=>x.id===id||(x.alts&&x.alts.some(a=>a.id===id));
+  const ti=todayData.findIndex(_matchId);
   if(ti>=0){ num=ti+1; }
   else {
     for(const d of Object.keys(sessions)){
-      const i=sessions[d].findIndex(x=>x.id===id);
+      const i=sessions[d].findIndex(_matchId);
       if(i>=0){ num=i+1; break; }
     }
   }
