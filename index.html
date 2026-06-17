@@ -275,23 +275,23 @@ select option{background:var(--bg2);color:var(--text)}
 /* ── history ── */
 .hist-btn{
   width:100%;text-align:left;padding:14px 18px;
-  background:var(--surface);border:1px solid var(--border);border-radius:2px;
+  background:transparent;border:none;border-top:1px solid var(--border);border-radius:0;
   cursor:pointer;margin-bottom:8px;
   display:flex;justify-content:space-between;align-items:center;
   font-size:.85rem;color:var(--text2);transition:.2s;font-family:inherit;font-weight:300;
 }
-.hist-btn:hover{border-color:var(--border2);color:var(--text);background:var(--surface2)}
+.hist-btn:hover{border-top-color:var(--border2);color:var(--text);background:transparent}
 .hist-detail{display:none;padding-left:0;margin-top:4px}
 .hist-detail.open{display:block}
 .month-hdr{
   width:100%;text-align:left;padding:12px 18px;
-  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:2px;
+  background:transparent;border:none;border-top:1px solid var(--border);border-radius:0;
   cursor:pointer;margin-bottom:6px;
   display:flex;justify-content:space-between;align-items:center;
   font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
   color:var(--text2);font-weight:400;transition:.2s;font-family:inherit;
 }
-.month-hdr:hover{border-color:var(--border2);background:var(--surface2);color:var(--text)}
+.month-hdr:hover{border-color:var(--border2);background:transparent;color:var(--text)}
 .month-body{display:none;padding-left:10px;margin-bottom:8px}
 .month-body.open{display:block}
 
@@ -2443,7 +2443,7 @@ function renderHistory(){
         const bLoop=`<button class="btn btn-ghost btn-sm" id="tloop-btn-${key}" onclick="playTopicOAI('${key}','loop')" ${_isOn('loop')?_onStyle:''}>${_isOn('loop')?_stopLbl:SVG.repeat+'&ensp;循環'}</button>`;
         const bShadow=`<button class="btn btn-ghost btn-sm" id="tshadow-btn-${key}" onclick="playTopicShadow('${key}')" ${_isOn('shadow')?_onStyle:''}>${_isOn('shadow')?_stopLbl:SVG.headphones+'&ensp;跟讀循環'}</button>`;
         return `
-        <div style="padding-left:10px;margin-bottom:6px">
+        <div style="padding-left:10px;margin-bottom:6px;border-top:1px solid var(--border)">
           <button class="hist-btn" style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.02);margin-bottom:4px;text-align:left;border-radius:2px" onclick="openHistModal('${key}')">
             <span style="color:${tColor};font-size:.88rem;font-weight:300">${tLabel}</span>
             <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
