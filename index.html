@@ -1729,7 +1729,10 @@ function renderNotes(){
   $('notes-list').innerHTML=collapseBar+dates.map(d=>{
     const items=byDate[d];
     const _noteDate=d.slice(0,10);
-    const _noteTopic=topics[d]?`&ensp;<span style="color:var(--text2);font-weight:400">${esc(topics[d])}</span>`:'';
+    const _firstId=items[0]?.id;
+    const _sessionKey=_firstId&&Object.keys(sessions).find(k=>sessions[k].some(s=>s.id===_firstId));
+    const _topicStr=topics[_sessionKey||d]||topics[d]||'';
+    const _noteTopic=_topicStr?`&ensp;<span style="color:var(--text2);font-weight:400">${esc(_topicStr)}</span>`:'';
     return `
     <button class="hist-btn" onclick="toggleHist('notes-${d}')">
       <span>${SVG.calDays}&ensp;${_noteDate}${_noteTopic}</span>
