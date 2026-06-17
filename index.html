@@ -2057,11 +2057,12 @@ async function _topicShadowNext(){
     audio.onerror=()=>{ if(_oaiAudio===audio) _stopOAI(); };
     audio.onended=()=>{
       if(_oaiAudio!==audio) return;
+      const savedDur=audio.duration||2;
       audio.src=''; audio.load();
       _oaiAudio=null;
       if(!_topicShadowKey) return;
       const isShadow=_topicShadowMode==='shadow';
-      const pauseDur=isShadow?(audio.duration||2)*1000:300;
+      const pauseDur=isShadow?savedDur*1000:300;
       if(isShadow) $('np-mode').innerHTML=SVG.mic+'&ensp;跟讀中';
       _topicShadowTimer=setTimeout(()=>{
         if(!_topicShadowKey) return;
