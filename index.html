@@ -897,8 +897,10 @@ let _currentHistModalKey = null;
 let _recAudio = null;
 let _recPlayingId = null;
 let _oaiAudio = null;
-let _oaiLoopId = null;
+let _oaiId = null;
+let _oaiMode = null;
 let _oaiBlobUrl = null;
+let _oaiTimer = null;
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllAltIdx = 0;
@@ -1471,10 +1473,9 @@ function cardHTML(s,i,opts){
     <div class="en"><span class="lang-tag">US</span>&ensp;${wordify(s.english)}</div>
     <div class="acts">
       <div class="play-grp">
-        <button class="icon-btn play-btn" data-play="once"   data-pid="${s.id}" title="播放一次">${SVG.play} 一次</button>
-        <button class="icon-btn play-btn" data-play="loop"   data-pid="${s.id}" title="循環播放">${SVG.repeat} 循環</button>
-        <button class="icon-btn play-btn" data-play="shadow" data-pid="${s.id}" title="跟讀練習（播一段、停一段）">${SVG.headphones} 跟讀</button>
-        <button class="icon-btn play-btn" data-oai="${s.id}" title="OpenAI 自然語音循環播放">✦&ensp;AI 循環</button>
+        <button class="icon-btn play-btn" data-play="once" data-pid="${s.id}" title="播放一次">${SVG.play}&ensp;一次</button>
+        <button class="icon-btn play-btn" data-oai="${s.id}" data-oai-mode="loop" title="OpenAI 自然語音循環">${SVG.repeat}&ensp;AI 循環</button>
+        <button class="icon-btn play-btn" data-oai="${s.id}" data-oai-mode="shadow" title="OpenAI 自然語音跟讀">${SVG.headphones}&ensp;AI 跟讀</button>
       </div>
       ${showRec?`<button class="icon-btn" data-rec="${s.id}" id="rb-${s.id}" title="錄音">${SVG.mic}</button><span id="rp-${s.id}">${recordings[s.id]?`<span class="rec-chip">🎵&ensp;<button class="btn btn-ghost btn-sm" onclick="playRec('${s.id}')">播放錄音</button></span>`:''}</span>`:''}
     </div>
@@ -1760,7 +1761,7 @@ document.addEventListener('click', e=>{
   const wd=e.target.closest('.w');
   if(wd){ lookupWord(wd.dataset.word); return; }
   const oai=e.target.closest('[data-oai]');
-  if(oai){ playOAI(oai.dataset.oai); return; }
+  if(oai){ playOAI(oai.dataset.oai, oai.dataset.oaiMode||'loop'); return; }
 });
 
 // ── SVG icons ──
@@ -1794,6 +1795,7 @@ const SVG = {
   chevronsUp: _i(`<path d="m17 11-5-5-5 5"/><path d="m17 17-5-5-5 5"/>`),
   plus:       _i(`<path d="M5 12h14"/><path d="M12 5v14"/>`),
   squarePlus: _i(`<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/>`),
+  hourglass:  _i(`<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>`),
 };
 const PLAY_LABELS = {once:SVG.play+' 一次', loop:SVG.repeat+' 循環', shadow:SVG.headphones+' 跟讀'};
 
@@ -1841,7 +1843,7 @@ function _playAllNext(){
   speechSynthesis.speak(ttsUtter);
 }
 
-// ── OpenAI TTS loop ──────────────────────────────────────────
+// ── OpenAI TTS（循環 + 跟讀）────────────────────────────────
 async function _oaiTTSFetch(text){
   const key=localStorage.getItem('anthropic_key');
   if(!key){ alert('請先在設定頁面輸入 OpenAI API Key'); throw new Error('no key'); }
@@ -1853,37 +1855,57 @@ async function _oaiTTSFetch(text){
   if(!res.ok){ let msg=res.status; try{const e=await res.json();msg=e.error?.message||msg;}catch(x){} throw new Error(msg); }
   return URL.createObjectURL(await res.blob());
 }
-function _oaiSetBtn(id, state){
-  document.querySelectorAll(`[data-oai="${id}"]`).forEach(b=>{
-    if(state==='loading'){ b.innerHTML='⏳ 載入…'; b.disabled=true; b.style.color=''; b.classList.remove('p-active'); }
+function _oaiSetBtn(id, mode, state){
+  const idleLabel=mode==='loop'?(SVG.repeat+'&ensp;AI 循環'):(SVG.headphones+'&ensp;AI 跟讀');
+  document.querySelectorAll(`[data-oai="${id}"][data-oai-mode="${mode}"]`).forEach(b=>{
+    if(state==='loading'){ b.innerHTML=SVG.hourglass+'&ensp;載入…'; b.disabled=true; b.style.color=''; b.classList.remove('p-active'); }
     else if(state==='playing'){ b.innerHTML=SVG.stop+'&ensp;停止'; b.disabled=false; b.style.color='var(--red)'; b.classList.add('p-active'); }
-    else { b.innerHTML='✦&ensp;AI 循環'; b.disabled=false; b.style.color=''; b.classList.remove('p-active'); }
+    else if(state==='shadowing'){ b.innerHTML=SVG.mic+'&ensp;跟讀中'; b.disabled=false; b.style.color='var(--green)'; b.classList.add('p-active'); }
+    else { b.innerHTML=idleLabel; b.disabled=false; b.style.color=''; b.classList.remove('p-active'); }
   });
 }
 function _stopOAI(){
+  if(_oaiTimer){ clearTimeout(_oaiTimer); _oaiTimer=null; }
   if(_oaiAudio){ _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null; }
   if(_oaiBlobUrl){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; }
-  const prev=_oaiLoopId; _oaiLoopId=null;
-  if(prev) _oaiSetBtn(prev,'idle');
+  const prev=_oaiId; const prevMode=_oaiMode;
+  _oaiId=null; _oaiMode=null;
+  if(prev&&prevMode) _oaiSetBtn(prev,prevMode,'idle');
 }
-async function playOAI(id){
-  if(_oaiLoopId===id){ _stopOAI(); return; }
-  speechSynthesis.cancel(); // stop regular TTS
+function _oaiPlayAudio(id){
+  if(_oaiId!==id) return;
+  const audio=new Audio(_oaiBlobUrl);
+  _oaiAudio=audio;
+  audio.onerror=()=>_stopOAI();
+  if(_oaiMode==='loop'){
+    audio.loop=true;
+    audio.play().catch(()=>_stopOAI());
+    _oaiSetBtn(id,'loop','playing');
+  } else {
+    audio.onended=()=>{
+      if(_oaiId!==id||_oaiMode!=='shadow') return;
+      const dur=(audio.duration||2)*1000;
+      _oaiSetBtn(id,'shadow','shadowing');
+      _oaiTimer=setTimeout(()=>{ if(_oaiId===id&&_oaiMode==='shadow') _oaiPlayAudio(id); }, dur);
+    };
+    audio.play().catch(()=>_stopOAI());
+    _oaiSetBtn(id,'shadow','playing');
+  }
+}
+async function playOAI(id, mode){
+  if(_oaiId===id&&_oaiMode===mode){ _stopOAI(); return; }
+  speechSynthesis.cancel();
   if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
   ttsUtter=null; playId=null; playMode=null;
   _stopOAI();
   const s=sMap[id]; if(!s) return;
   const text=_preferredText(s);
-  _oaiLoopId=id;
-  _oaiSetBtn(id,'loading');
+  _oaiId=id; _oaiMode=mode;
+  _oaiSetBtn(id,mode,'loading');
   try{
     _oaiBlobUrl=await _oaiTTSFetch(text);
-    if(_oaiLoopId!==id){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; return; }
-    _oaiAudio=new Audio(_oaiBlobUrl);
-    _oaiAudio.loop=true;
-    _oaiAudio.onerror=()=>_stopOAI();
-    await _oaiAudio.play();
-    _oaiSetBtn(id,'playing');
+    if(_oaiId!==id||_oaiMode!==mode){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; return; }
+    _oaiPlayAudio(id);
   }catch(e){
     _stopOAI();
     if(e.message!=='no key') alert('OpenAI 語音錯誤：'+e.message);
