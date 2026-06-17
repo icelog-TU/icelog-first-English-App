@@ -284,6 +284,20 @@ select option{background:var(--bg2);color:var(--text)}
 .hist-btn:hover{border-top-color:var(--border2);color:var(--text);background:transparent}
 .hist-detail{display:none;padding-left:0;margin-top:4px}
 .hist-detail.open{display:block}
+/* ── notes accordion ── */
+.notes-month-btn{
+  width:100%;text-align:left;padding:12px 18px;
+  background:transparent;border:none;border-top:1px solid var(--border);border-radius:0;
+  cursor:pointer;margin-bottom:0;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text2);font-weight:400;transition:.2s;font-family:inherit;
+}
+.notes-month-btn.open{border-top-color:var(--g2)}
+.notes-month-btn:hover{color:var(--text)}
+.notes-month-body{display:none;margin-bottom:8px}
+.notes-month-body.open{display:block}
+
 .month-hdr{
   width:100%;text-align:left;padding:12px 18px;
   background:transparent;border:none;border-top:1px solid var(--border);border-radius:0;
@@ -1793,29 +1807,27 @@ function renderNotes(){
     $('notes-list').innerHTML=`<div class="empty">${SVG.star}<br>還沒有標記任何重點<br><span style="font-size:.82rem">點句子右上角的星星按鈕來標記重點句子</span></div>`;
     return;
   }
-  const byDate={};
+  const byMonth={};
   ids.forEach(id=>{
     const h=highlights[id];
-    if(!byDate[h.date]) byDate[h.date]=[];
-    byDate[h.date].push({id,...h});
+    const ym=(h.date||'').slice(0,7);
+    if(!byMonth[ym]) byMonth[ym]=[];
+    byMonth[ym].push({id,...h});
   });
-  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
   const collapseBar=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-    <button class="btn btn-ghost btn-sm" onclick="collapseAll('notes-list')">${SVG.chevronsUp}&ensp;收起全部</button>
+    <button class="btn btn-ghost btn-sm" onclick="collapseNotesAll()">${SVG.chevronsUp}&ensp;收起全部</button>
   </div>`;
-  $('notes-list').innerHTML=collapseBar+dates.map(d=>{
-    const items=byDate[d];
-    const _noteDate=d.slice(0,10);
-    const _firstId=items[0]?.id;
-    const _sessionKey=_firstId&&Object.keys(sessions).find(k=>sessions[k].some(s=>s.id===_firstId));
-    const _topicStr=topics[_sessionKey||d]||topics[d]||'';
-    const _noteTopic=_topicStr?`&ensp;<span style="color:var(--text2);font-weight:400">${esc(_topicStr)}</span>`:'';
+  $('notes-list').innerHTML=collapseBar+months.map((ym,idx)=>{
+    const [y,mo]=ym.split('-');
+    const items=byMonth[ym];
+    const isFirst=idx===0;
     return `
-    <button class="hist-btn" onclick="toggleHist('notes-${d}')">
-      <span>${SVG.calDays}&ensp;${_noteDate}${_noteTopic}</span>
-      <span class="badge">${items.length} 個重點</span>
+    <button class="notes-month-btn${isFirst?' open':''}" id="notes-mbtn-${ym}" onclick="toggleNotesMonth('${ym}')">
+      <span>${y}年${parseInt(mo)}月</span>
+      <span style="display:flex;align-items:center;gap:8px"><span class="badge">${items.length} 個重點</span><span id="notes-marr-${ym}">${isFirst?'▲':'▼'}</span></span>
     </button>
-    <div class="hist-detail" id="hd-notes-${d}">
+    <div class="notes-month-body${isFirst?' open':''}" id="notes-mbody-${ym}">
       ${items.map(h=>{
         sMap[h.id]={id:h.id,chinese:h.chinese,english:h.english};
         return cardHTML({id:h.id,chinese:h.chinese,english:h.english},0,
@@ -1823,6 +1835,18 @@ function renderNotes(){
       }).join('')}
     </div>`;
   }).join('');
+}
+function toggleNotesMonth(ym){
+  const btn=$(`notes-mbtn-${ym}`), body=$(`notes-mbody-${ym}`);
+  if(!btn||!body) return;
+  const open=body.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  const arr=$(`notes-marr-${ym}`); if(arr) arr.textContent=open?'▲':'▼';
+}
+function collapseNotesAll(){
+  document.querySelectorAll('.notes-month-body').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.notes-month-btn').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('[id^="notes-marr-"]').forEach(el=>el.textContent='▼');
 }
 
 document.addEventListener('click', e=>{
