@@ -694,7 +694,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
     </div>
 
     <!-- ⑤ 錄音管理 -->
-    <div class="cfg-section" style="border-bottom:none">
+    <div class="cfg-section">
       <button class="cfg-hdr" onclick="toggleCfgSection('cfg-rec')">
         錄音管理
         <span class="cfg-arr" id="cfg-arr-rec">▼</span>
@@ -703,6 +703,19 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
         <p style="font-size:.76rem;color:var(--text3);margin:8px 0 10px;line-height:1.6">錄音檔儲存在瀏覽器本機，佔用空間較大。練習完後可一鍵清除所有錄音，釋放空間。</p>
         <span id="rec-storage-info" style="font-size:.78rem;color:var(--text3);display:block;margin-bottom:8px"></span>
         <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--red);border-color:rgba(228,76,101,.3)" onclick="clearAllRecordings()">清除全部錄音</button>
+      </div>
+    </div>
+
+    <!-- ⑥ AI 音檔快取 -->
+    <div class="cfg-section" style="border-bottom:none">
+      <button class="cfg-hdr" onclick="toggleCfgSection('cfg-oai-cache')">
+        AI 音檔快取
+        <span class="cfg-arr" id="cfg-arr-oai-cache">▼</span>
+      </button>
+      <div class="cfg-body" id="cfg-oai-cache">
+        <p style="font-size:.76rem;color:var(--text3);margin:8px 0 12px;line-height:1.6">AI 語音音檔暫存在記憶體中，關閉頁面即自動清除，不佔用磁碟空間。同一句子再次播放時直接使用快取，不重複下載。如需立即釋放記憶體可點下方按鈕。</p>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="clearOAICache()">清除所有 AI 音檔快取</button>
+        <div id="oai-cache-status" style="font-size:.78rem;color:var(--text3);margin-top:8px;text-align:center"></div>
       </div>
     </div>
     </div>
@@ -901,6 +914,7 @@ let _oaiId = null;
 let _oaiMode = null;
 let _oaiBlobUrl = null;
 let _oaiTimer = null;
+const _oaiCache = new Map();
 let playAllList = [];
 let playAllIdx  = 0;
 let playAllAltIdx = 0;
@@ -1844,7 +1858,8 @@ function _playAllNext(){
 }
 
 // ── OpenAI TTS（循環 + 跟讀）────────────────────────────────
-async function _oaiTTSFetch(text){
+async function _oaiTTSFetch(cacheKey, text){
+  if(_oaiCache.has(cacheKey)) return _oaiCache.get(cacheKey);
   const key=localStorage.getItem('anthropic_key');
   if(!key){ alert('請先在設定頁面輸入 OpenAI API Key'); throw new Error('no key'); }
   const res=await fetch('https://api.openai.com/v1/audio/speech',{
@@ -1853,7 +1868,9 @@ async function _oaiTTSFetch(text){
     body:JSON.stringify({model:'tts-1-hd',input:text,voice:'nova'})
   });
   if(!res.ok){ let msg=res.status; try{const e=await res.json();msg=e.error?.message||msg;}catch(x){} throw new Error(msg); }
-  return URL.createObjectURL(await res.blob());
+  const url=URL.createObjectURL(await res.blob());
+  _oaiCache.set(cacheKey, url);
+  return url;
 }
 function _oaiSetBtn(id, mode, state){
   const idleLabel={once:SVG.play+'&ensp;一次',loop:SVG.repeat+'&ensp;循環',shadow:SVG.headphones+'&ensp;跟讀'}[mode]||SVG.play+'&ensp;一次';
@@ -1867,10 +1884,17 @@ function _oaiSetBtn(id, mode, state){
 function _stopOAI(){
   if(_oaiTimer){ clearTimeout(_oaiTimer); _oaiTimer=null; }
   if(_oaiAudio){ _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null; }
-  if(_oaiBlobUrl){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; }
+  _oaiBlobUrl=null;
   const prev=_oaiId; const prevMode=_oaiMode;
   _oaiId=null; _oaiMode=null;
   if(prev&&prevMode) _oaiSetBtn(prev,prevMode,'idle');
+}
+function clearOAICache(){
+  _stopOAI();
+  _oaiCache.forEach(url=>URL.revokeObjectURL(url));
+  _oaiCache.clear();
+  const st=$('oai-cache-status');
+  if(st){ st.textContent='已清除所有 AI 音檔快取'; setTimeout(()=>{ if(st) st.textContent=''; },3000); }
 }
 function _oaiPlayAudio(id){
   if(_oaiId!==id) return;
@@ -1907,8 +1931,8 @@ async function playOAI(id, mode){
   _oaiId=id; _oaiMode=mode;
   _oaiSetBtn(id,mode,'loading');
   try{
-    _oaiBlobUrl=await _oaiTTSFetch(text);
-    if(_oaiId!==id||_oaiMode!==mode){ URL.revokeObjectURL(_oaiBlobUrl); _oaiBlobUrl=null; return; }
+    _oaiBlobUrl=await _oaiTTSFetch(id, text);
+    if(_oaiId!==id||_oaiMode!==mode){ _oaiBlobUrl=null; return; }
     _oaiPlayAudio(id);
   }catch(e){
     _stopOAI();
