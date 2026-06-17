@@ -2125,7 +2125,11 @@ function showTab(name,btn,_push=true){
   else document.querySelector(`.tab[onclick*="'${name}'"]`)?.classList.add('on');
   localStorage.setItem('ui_tab',name);
   if(_push) history.pushState({tab:name},'');
-  if(name==='history')  renderHistory();
+  if(name==='history'){
+    renderHistory();
+    const _latestKey=Object.keys(sessions).sort((a,b)=>b.localeCompare(a))[0];
+    if(_latestKey) setTimeout(()=>{ if(!_currentHistModalKey) openHistModal(_latestKey); },0);
+  }
   if(name==='practice') renderPracticeOpts();
   if(name==='notes')    renderNotes();
 }
