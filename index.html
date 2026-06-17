@@ -1887,7 +1887,7 @@ function _stopOAI(){
   _oaiBlobUrl=null;
   const prev=_oaiId; const prevMode=_oaiMode;
   _oaiId=null; _oaiMode=null;
-  if(prev&&prevMode) _oaiSetBtn(prev,prevMode,'idle');
+  if(prev&&prevMode){ _oaiSetBtn(prev,prevMode,'idle'); hideNowPlaying(); }
 }
 function clearOAICache(){
   _stopOAI();
@@ -1905,10 +1905,12 @@ function _oaiPlayAudio(id){
     audio.onended=()=>_stopOAI();
     audio.play().catch(()=>_stopOAI());
     _oaiSetBtn(id,'once','playing');
+    showNowPlaying(id,'once');
   } else if(_oaiMode==='loop'){
     audio.loop=true;
     audio.play().catch(()=>_stopOAI());
     _oaiSetBtn(id,'loop','playing');
+    showNowPlaying(id,'loop');
   } else {
     audio.onended=()=>{
       if(_oaiId!==id||_oaiMode!=='shadow') return;
@@ -1918,6 +1920,7 @@ function _oaiPlayAudio(id){
     };
     audio.play().catch(()=>_stopOAI());
     _oaiSetBtn(id,'shadow','playing');
+    showNowPlaying(id,'shadow');
   }
 }
 async function playOAI(id, mode){
