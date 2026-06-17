@@ -2020,9 +2020,13 @@ async function playTopicShadow(key){
   ttsUtter=null; playId=null; playMode=null;
   _stopOAI();
   const ss=sessions[key]; if(!ss||!ss.length) return;
-  ss.forEach(s=>sMap[s.id]=s);
+  ss.forEach(s=>{
+    sMap[s.id]=s;
+    if(s.alts) s.alts.forEach(a=>{ sMap[a.id]={id:a.id,chinese:s.chinese,english:a.text}; });
+  });
   _topicShadowKey=key;
-  _topicShadowList=ss.map(s=>s.id);
+  // flat list: if sentence has alts → use alt IDs; else → use sentence id
+  _topicShadowList=ss.flatMap(s=>(s.alts&&s.alts.length)?s.alts.map(a=>a.id):[s.id]);
   _topicShadowIdx=0;
   _setTopicShadowBtn(key,'playing');
   await _topicShadowNext();
