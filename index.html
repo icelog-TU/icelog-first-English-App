@@ -426,10 +426,15 @@ select option{background:var(--bg2);color:var(--text)}
 .notes-ta{
   width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);
   border-radius:2px;padding:9px 12px;font-size:.86rem;font-family:inherit;font-weight:300;
-  color:var(--text);resize:vertical;min-height:65px;line-height:1.65;transition:border-color .2s;
+  color:var(--text);resize:none;min-height:180px;line-height:1.65;transition:border-color .2s;
 }
 .notes-ta:focus{outline:none;border-color:var(--g2)}
 .notes-ta::placeholder{color:var(--text3)}
+.note-display{
+  font-size:.86rem;color:var(--text);line-height:1.75;
+  white-space:pre-wrap;word-break:break-word;padding:2px;
+}
+.note-empty-btn{color:var(--text3);border-color:transparent;font-size:.8rem}
 .chat-wrap{margin-top:9px;display:none}
 .chat-wrap.open{display:block}
 .chat-msgs{max-height:200px;overflow-y:auto;margin-bottom:8px;display:flex;flex-direction:column;gap:7px}
@@ -751,6 +756,18 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
         onmouseout="this.style.background='rgba(255,255,255,.07)'">✕</button>
     </div>
     <div id="hist-modal-body" style="padding:16px 0"></div>
+  </div>
+</div>
+
+<!-- Note edit modal -->
+<div class="overlay hide" id="note-edit-modal" onclick="_closeNoteModal(event)">
+  <div class="modal">
+    <h2>我的<span class="grad-text">筆記</span></h2>
+    <textarea class="notes-ta" id="note-edit-ta" placeholder="輸入你的想法、疑問…&#10;例如：這個用法跟我想的哪裡不同？跟哪個句子類似？"></textarea>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="_saveNoteModal()">儲存</button>
+      <button class="btn btn-ghost" style="justify-content:center" onclick="hideModal('note-edit-modal')">取消</button>
+    </div>
   </div>
 </div>
 
@@ -1546,13 +1563,17 @@ function notesPanelHTML(id){
   const msgs=disc.map(m=>
     `<div class="chat-${m.role==='user'?'u':'a'}"><span>${esc(m.content).replace(/\n/g,'<br>')}</span></div>`
   ).join('');
+  const noteHTML = note
+    ? `<div class="note-display">${esc(note).replace(/\n/g,'<br>')}</div>`
+    : `<span style="font-size:.8rem;color:var(--text3)">尚未新增筆記</span>`;
   return `
   <div class="notes-panel" id="notes-panel-${id}">
-    <div class="notes-lbl">我的筆記</div>
-    <textarea class="notes-ta" id="note-ta-${id}"
-      placeholder="輸入你的想法、疑問…&#10;例如：這個用法跟我想的哪裡不同？跟哪個句子類似？"
-      onblur="saveNote('${id}',this.value)">${esc(note)}</textarea>
-    <div style="margin-top:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="notes-lbl" style="margin-bottom:0">我的筆記</div>
+      <button class="btn btn-ghost btn-sm" onclick="openNoteModal('${id}')">${SVG.pencil}&ensp;${note?'編輯':'新增'}</button>
+    </div>
+    <div class="note-display-wrap" id="note-disp-${id}">${noteHTML}</div>
+    <div style="margin-top:10px">
       <button class="btn btn-ghost btn-sm" onclick="toggleAIChat('${id}')">${SVG.bot}&ensp;與 AI 討論</button>
     </div>
     <div class="chat-wrap${chatOpen?' open':''}" id="aichat-${id}">
@@ -1647,10 +1668,6 @@ function saveHighlights(){ localStorage.setItem('eng_highlights',JSON.stringify(
 
 function toggleHighlight(id){
   const s=sMap[id]; if(!s) return;
-  document.querySelectorAll('.notes-ta').forEach(ta=>{
-    const tid=ta.id.replace('note-ta-','');
-    if(highlights[tid]) highlights[tid].note=ta.value;
-  });
   if(highlights[id]){
     delete highlights[id];
   } else {
@@ -1672,6 +1689,37 @@ function saveNote(id,text){
   if(!highlights[id]) return;
   highlights[id].note=text;
   saveHighlights();
+}
+
+let _noteModalId=null;
+function openNoteModal(id){
+  _noteModalId=id;
+  const h=highlights[id]||{};
+  $('note-edit-ta').value=h.note||'';
+  $('note-edit-modal').classList.remove('hide');
+  setTimeout(()=>$('note-edit-ta').focus(),80);
+}
+function _closeNoteModal(e){
+  if(e&&e.target!==$('note-edit-modal')) return;
+  hideModal('note-edit-modal');
+  _noteModalId=null;
+}
+function _saveNoteModal(){
+  if(!_noteModalId) return;
+  const id=_noteModalId;
+  const text=$('note-edit-ta').value;
+  saveNote(id,text);
+  const wrap=$('note-disp-'+id);
+  if(wrap) wrap.innerHTML=text
+    ?`<div class="note-display">${esc(text).replace(/\n/g,'<br>')}</div>`
+    :`<span style="font-size:.8rem;color:var(--text3)">尚未新增筆記</span>`;
+  const panel=$('notes-panel-'+id);
+  if(panel){
+    const editBtn=panel.querySelector('.btn[onclick*="openNoteModal"]');
+    if(editBtn) editBtn.innerHTML=SVG.pencil+'&ensp;'+(text?'編輯':'新增');
+  }
+  hideModal('note-edit-modal');
+  _noteModalId=null;
 }
 
 function toggleAIChat(id){
