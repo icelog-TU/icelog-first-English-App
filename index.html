@@ -2444,7 +2444,7 @@ function renderHistory(){
         const bShadow=`<button class="btn btn-ghost btn-sm" id="tshadow-btn-${key}" onclick="playTopicShadow('${key}')" ${_isOn('shadow')?_onStyle:''}>${_isOn('shadow')?_stopLbl:SVG.headphones+'&ensp;跟讀循環'}</button>`;
         return `
         <div style="padding-left:10px;margin-bottom:6px;border-top:1px solid var(--border)">
-          <button class="hist-btn" style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.02);margin-bottom:4px;text-align:left;border-radius:2px" onclick="openHistModal('${key}')">
+          <button class="hist-btn" style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;background:transparent;margin-bottom:4px;text-align:left;border-radius:0" onclick="openHistModal('${key}')">
             <span style="color:${tColor};font-size:.88rem;font-weight:300">${tLabel}</span>
             <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
           </button>
