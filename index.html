@@ -2614,7 +2614,7 @@ function clearPracInput(id){
   const input=$('prac-in-'+id);
   const dispEl=$('prac-disp-'+id);
   if(dispEl) dispEl.style.display='none';
-  if(input){input.style.display='';input.focus();}
+  if(input){input.value='';input.style.display='';input.focus();}
 }
 async function aiCheck(id, btn){
   const s=sMap[id]; if(!s) return;
