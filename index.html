@@ -898,6 +898,7 @@ let _recAudio = null;
 let _recPlayingId = null;
 let playAllList = [];
 let playAllIdx  = 0;
+let playAllAltIdx = 0;
 let playAllLoop = false;
 
 const $   = id => document.getElementById(id);
@@ -1796,25 +1797,34 @@ function playAll(dateKey, loop){
   ss.forEach(s=>sMap[s.id]=s);
   playAllList=ss.map(s=>s.id);
   playAllIdx=0;
+  playAllAltIdx=0;
   playAllLoop=loop;
   playMode=loop?'all-loop':'all-once';
   _playAllNext();
 }
 
+function _playAllTexts(s){
+  if(s.alts && s.alts.length) return s.alts.map(a=>a.text);
+  return [s.english];
+}
+
 function _playAllNext(){
   if(playAllIdx>=playAllList.length){
-    if(playAllLoop){ playAllIdx=0; }
+    if(playAllLoop){ playAllIdx=0; playAllAltIdx=0; }
     else{ stopPlayback(); return; }
   }
   const id=playAllList[playAllIdx];
   const s=sMap[id];
-  if(!s){ playAllIdx++; _playAllNext(); return; }
+  if(!s){ playAllIdx++; playAllAltIdx=0; _playAllNext(); return; }
+  const texts=_playAllTexts(s);
+  if(playAllAltIdx>=texts.length){ playAllIdx++; playAllAltIdx=0; _playAllNext(); return; }
+  const text=texts[playAllAltIdx];
   playId=id;
   showNowPlaying(id,playMode);
-  ttsUtter=mkUtter(_preferredText(s));
+  ttsUtter=mkUtter(text);
   ttsUtter.onend=()=>{
     if(playMode!=='all-once'&&playMode!=='all-loop') return;
-    playAllIdx++;
+    playAllAltIdx++;
     shadowTimer=setTimeout(_playAllNext,500);
   };
   speechSynthesis.speak(ttsUtter);
@@ -1824,7 +1834,7 @@ function stopPlayback(){
   speechSynthesis.cancel();
   if(shadowTimer){clearTimeout(shadowTimer);shadowTimer=null;}
   ttsUtter=null;
-  playAllList=[]; playAllIdx=0; playAllLoop=false;
+  playAllList=[]; playAllIdx=0; playAllAltIdx=0; playAllLoop=false;
   if(playId){
     document.querySelectorAll(`.play-btn[data-pid="${playId}"]`).forEach(b=>{
       b.innerHTML=PLAY_LABELS[b.dataset.play]||SVG.play;
