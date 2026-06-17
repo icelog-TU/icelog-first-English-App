@@ -1938,7 +1938,7 @@ function _stopOAI(){
   if(_topicShadowTimer){ clearTimeout(_topicShadowTimer); _topicShadowTimer=null; }
   if(_oaiAudio){
     _oaiAudio.onerror=null; _oaiAudio.onended=null;
-    _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio=null;
+    _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio.load(); _oaiAudio=null;
   }
   const prev=_oaiId; const prevMode=_oaiMode;
   const prevTopicKey=_topicShadowKey; const prevTopicMode=_topicShadowMode;
@@ -1958,27 +1958,30 @@ function _oaiPlayAudio(id){
   if(_oaiId!==id) return;
   const url=_oaiCache.get(id);
   if(!url){ _stopOAI(); return; }
+  if(_oaiAudio){ _oaiAudio.onerror=null; _oaiAudio.onended=null; _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio.load(); _oaiAudio=null; }
   const audio=new Audio(url);
   _oaiAudio=audio;
-  audio.onerror=()=>_stopOAI();
+  audio.onerror=()=>{ if(_oaiAudio===audio) _stopOAI(); };
   if(_oaiMode==='once'){
-    audio.onended=()=>_stopOAI();
-    audio.play().catch(()=>_stopOAI());
+    audio.onended=()=>{ if(_oaiAudio===audio) _stopOAI(); };
+    audio.play().catch(()=>{ if(_oaiAudio===audio) _stopOAI(); });
     _oaiSetBtn(id,'once','playing');
     showNowPlaying(id,'once');
   } else if(_oaiMode==='loop'){
     audio.loop=true;
-    audio.play().catch(()=>_stopOAI());
+    audio.play().catch(()=>{ if(_oaiAudio===audio) _stopOAI(); });
     _oaiSetBtn(id,'loop','playing');
     showNowPlaying(id,'loop');
   } else {
     audio.onended=()=>{
       if(_oaiId!==id||_oaiMode!=='shadow') return;
       const dur=(audio.duration||2)*1000;
+      audio.src=''; audio.load();
+      _oaiAudio=null;
       _oaiSetBtn(id,'shadow','shadowing');
       _oaiTimer=setTimeout(()=>{ if(_oaiId===id&&_oaiMode==='shadow') _oaiPlayAudio(id); }, dur);
     };
-    audio.play().catch(()=>_stopOAI());
+    audio.play().catch(()=>{ if(_oaiAudio===audio) _stopOAI(); });
     _oaiSetBtn(id,'shadow','playing');
     showNowPlaying(id,'shadow');
   }
@@ -2048,6 +2051,7 @@ async function _topicShadowNext(){
     audio.onerror=()=>{ if(_oaiAudio===audio) _stopOAI(); };
     audio.onended=()=>{
       if(_oaiAudio!==audio) return;
+      audio.src=''; audio.load();
       _oaiAudio=null;
       if(!_topicShadowKey) return;
       const isShadow=_topicShadowMode==='shadow';
@@ -2202,12 +2206,7 @@ function playShadow(id,text){
 async function toggleRec(id){
   if(recFor===id && recorder?.state==='recording'){ recorder.stop(); return; }
   if(recorder?.state==='recording') recorder.stop();
-  // 停止 OAI 音檔，釋放音訊 session，讓裝置可以切換為錄音模式
-  if(_oaiAudio){
-    _oaiAudio.onerror=null; _oaiAudio.onended=null;
-    _oaiAudio.pause(); _oaiAudio.src=''; _oaiAudio.load(); _oaiAudio=null;
-  }
-  await new Promise(r=>setTimeout(r,120));
+  _stopOAI();
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
     recChunks=[];recFor=id;
