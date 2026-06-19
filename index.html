@@ -1072,6 +1072,18 @@ function init(){
       _histModalInputTimer=setTimeout(()=>{ _histModalInputBusy=false; },600);
     }
   });
+  $('note-edit-modal').addEventListener('focusin', e=>{
+    if(e.target.tagName==='TEXTAREA'){
+      _noteModalInputBusy=true;
+      if(_noteModalInputTimer){ clearTimeout(_noteModalInputTimer); _noteModalInputTimer=null; }
+    }
+  });
+  $('note-edit-modal').addEventListener('focusout', e=>{
+    if(e.target.tagName==='TEXTAREA'){
+      if(_noteModalInputTimer) clearTimeout(_noteModalInputTimer);
+      _noteModalInputTimer=setTimeout(()=>{ _noteModalInputBusy=false; },600);
+    }
+  });
 
   if(savedTab!=='today'){
     const savedModalKey=localStorage.getItem('ui_histModalKey');
@@ -1752,7 +1764,9 @@ function openNoteModal(id){
   $('note-edit-modal').classList.remove('hide');
   setTimeout(()=>$('note-edit-ta').focus(),80);
 }
+let _noteModalInputBusy=false, _noteModalInputTimer=null;
 function _closeNoteModal(e){
+  if(_noteModalInputBusy) return;
   if(e&&e.target!==$('note-edit-modal')) return;
   hideModal('note-edit-modal');
   _noteModalId=null;
