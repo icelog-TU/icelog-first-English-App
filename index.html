@@ -1056,6 +1056,20 @@ function init(){
   // ── restore last tab / practice / scroll ──
   const savedTab=localStorage.getItem('ui_tab')||'today';
   history.replaceState({tab:savedTab},'');
+  // prevent modal from closing when virtual keyboard is dismissed on mobile
+  $('hist-modal').addEventListener('focusin', e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'){
+      _histModalInputBusy=true;
+      if(_histModalInputTimer){ clearTimeout(_histModalInputTimer); _histModalInputTimer=null; }
+    }
+  });
+  $('hist-modal').addEventListener('focusout', e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'){
+      if(_histModalInputTimer) clearTimeout(_histModalInputTimer);
+      _histModalInputTimer=setTimeout(()=>{ _histModalInputBusy=false; },600);
+    }
+  });
+
   if(savedTab!=='today'){
     const savedModalKey=localStorage.getItem('ui_histModalKey');
     showTab(savedTab,null,false);
@@ -1188,7 +1202,9 @@ function confirmEditTopic(){
   $('topic-edit-area').style.display='none';
   renderHistory();
 }
+let _histModalInputBusy=false, _histModalInputTimer=null;
 function closeHistModal(e){
+  if(_histModalInputBusy) return;
   if(e && e.target!==$('hist-modal')) return;
   $('hist-modal').classList.add('hide');
   _currentHistModalKey=null;
