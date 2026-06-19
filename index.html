@@ -823,7 +823,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.45
     <div class="header-logo-mark">EN</div>
     <h1>英文<span>學習</span>助手</h1>
   </div>
-  <button class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
+  <div style="display:flex;align-items:center;gap:4px">
+    <button class="icon-btn" id="refresh-btn" onclick="location.reload()" title="重新整理">↺</button>
+    <button class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
+  </div>
 </header>
 
 <!-- Tabs -->
@@ -987,7 +990,9 @@ function applyIcons(){
   document.querySelectorAll('.tab').forEach((t,i)=>{
     if(tabDefs[i]) t.innerHTML=tabDefs[i][0]+'&ensp;'+tabDefs[i][1];
   });
-  // Header settings button
+  // Header buttons
+  const refBtn=$('refresh-btn');
+  if(refBtn) refBtn.innerHTML=SVG.refresh;
   const settBtn=document.querySelector('button[onclick="openSettings()"]');
   if(settBtn) settBtn.innerHTML=SVG.settings;
   // Action buttons (today page)
@@ -1955,6 +1960,7 @@ const SVG = {
   calDays:    _i(`<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>`),
   dumbbell:   _i(`<path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/>`),
   chevronsUp: _i(`<path d="m17 11-5-5-5 5"/><path d="m17 17-5-5-5 5"/>`),
+  refresh:    _i(`<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>`),
   plus:       _i(`<path d="M5 12h14"/><path d="M12 5v14"/>`),
   squarePlus: _i(`<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/>`),
   hourglass:  _i(`<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>`),
