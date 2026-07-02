@@ -1731,6 +1731,11 @@ function confirmEditZh(sid, el){
   _rerenderActive();
 }
 function _findSentence(sid){
+  // When history modal is open, search that session first so mutations go to the right place
+  if(_currentHistModalKey){
+    const arr=sessions[_currentHistModalKey];
+    if(arr){ const s=arr.find(x=>x.id===sid); if(s) return {s, save:()=>{ localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }}; }
+  }
   let s=todayData.find(x=>x.id===sid);
   if(s) return {s, save:()=>{ sessions[currentSessionKey||today()]=todayData; localStorage.setItem('eng_sessions',JSON.stringify(sessions)); gistPushDebounced(); }};
   for(const d of Object.keys(sessions)){
