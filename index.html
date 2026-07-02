@@ -2574,13 +2574,13 @@ function renderHistory(){
         const bLoop=`<button class="btn btn-ghost btn-sm" id="tloop-btn-${key}" onclick="playTopicOAI('${key}','loop')" ${_isOn('loop')?_onStyle:''}>${_isOn('loop')?_stopLbl:SVG.repeat+'&ensp;循環'}</button>`;
         const bShadow=`<button class="btn btn-ghost btn-sm" id="tshadow-btn-${key}" onclick="playTopicShadow('${key}')" ${_isOn('shadow')?_onStyle:''}>${_isOn('shadow')?_stopLbl:SVG.headphones+'&ensp;跟讀循環'}</button>`;
         return `
-        <div style="padding-left:10px;margin-bottom:6px;border-top:1px solid var(--border)">
+        <div style="padding:0 18px 6px 10px;margin-bottom:6px;border-top:1px solid var(--border)">
           <div style="display:flex;align-items:center;margin-bottom:4px">
             <div onclick="openHistModal('${key}')" style="flex:1;display:flex;align-items:center;padding:12px 6px 12px 0;cursor:pointer;min-width:0">
               <span id="tname-${key}" style="color:${tColor};font-size:.88rem;font-weight:300;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tLabel}</span>
             </div>
-            <button onclick="editTopicFromList('${key}')" style="background:transparent;border:none;color:var(--text3);padding:8px 4px;cursor:pointer;flex-shrink:0;line-height:0" title="編輯主題名稱">${SVG.pencil}</button>
-            <span class="badge" style="font-size:.58rem;flex-shrink:0;margin-left:4px">${ss.length} 句</span>
+            <span style="font-size:.75rem;color:var(--text3);flex-shrink:0;margin-right:8px">${ss.length}&thinsp;句</span>
+            <button onclick="editTopicFromList('${key}')" style="background:transparent;border:none;color:var(--text3);padding:8px 0;cursor:pointer;flex-shrink:0;line-height:0" title="編輯主題名稱">${SVG.pencil}</button>
           </div>
           <div style="display:flex;gap:5px;padding-bottom:2px;flex-wrap:wrap">
             ${bPlay}${bLoop}${bShadow}
