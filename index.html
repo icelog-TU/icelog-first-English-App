@@ -20,6 +20,8 @@
   --surface2: rgba(255,255,255,0.07);
   --border:   rgba(255,255,255,0.1);
   --border2:  rgba(255,255,255,0.22);
+
+  
   --g1:       #c0392b;
   --g2:       #e44c65;
   --gradient: linear-gradient(to right,#c0392b,#e44c65);
@@ -1221,6 +1223,36 @@ function confirmEditTopic(){
   $('hist-modal-topic').style.color=newTopic?'var(--text)':'var(--text3)';
   $('topic-edit-area').style.display='none';
   renderHistory();
+}
+
+function editTopicFromList(key){
+  const nameEl=$('tname-'+key);
+  if(!nameEl) return;
+  const cur=topics[key]||'';
+  const inp=document.createElement('input');
+  inp.value=cur;
+  inp.placeholder='輸入主題名稱';
+  inp.style.cssText='font-size:.85rem;background:var(--bg2);color:var(--text);border:1px solid var(--g2);border-radius:6px;padding:4px 8px;flex:1;min-width:0;font-family:inherit;outline:none';
+  nameEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done=false;
+  function doSave(){
+    if(done) return; done=true;
+    const v=inp.value.trim();
+    if(v) topics[key]=v; else delete topics[key];
+    localStorage.setItem('eng_topics',JSON.stringify(topics));
+    gistPushDebounced();
+    renderHistory();
+  }
+  function doCancel(){
+    if(done) return; done=true;
+    renderHistory();
+  }
+  inp.addEventListener('blur', doSave);
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ inp.blur(); }
+    if(e.key==='Escape'){ inp.removeEventListener('blur',doSave); doCancel(); }
+  });
 }
 let _histModalInputBusy=false, _histModalInputTimer=null;
 function closeHistModal(e){
@@ -2543,10 +2575,13 @@ function renderHistory(){
         const bShadow=`<button class="btn btn-ghost btn-sm" id="tshadow-btn-${key}" onclick="playTopicShadow('${key}')" ${_isOn('shadow')?_onStyle:''}>${_isOn('shadow')?_stopLbl:SVG.headphones+'&ensp;跟讀循環'}</button>`;
         return `
         <div style="padding-left:10px;margin-bottom:6px;border-top:1px solid var(--border)">
-          <button class="hist-btn" style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;background:transparent;margin-bottom:4px;text-align:left;border-radius:0" onclick="openHistModal('${key}')">
-            <span style="color:${tColor};font-size:.88rem;font-weight:300">${tLabel}</span>
-            <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
-          </button>
+          <div style="display:flex;align-items:center;margin-bottom:4px">
+            <div onclick="openHistModal('${key}')" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 6px 12px 0;cursor:pointer;min-width:0">
+              <span id="tname-${key}" style="color:${tColor};font-size:.88rem;font-weight:300;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tLabel}</span>
+              <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
+            </div>
+            <button onclick="editTopicFromList('${key}')" style="background:transparent;border:none;color:var(--text3);padding:8px 6px;cursor:pointer;flex-shrink:0;line-height:0" title="編輯主題名稱">${SVG.pencil}</button>
+          </div>
           <div style="display:flex;gap:5px;padding-bottom:2px;flex-wrap:wrap">
             ${bPlay}${bLoop}${bShadow}
             <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(228,76,101,.3)" onclick="deleteSession('${key}')">${SVG.trash}</button>
