@@ -2576,11 +2576,11 @@ function renderHistory(){
         return `
         <div style="padding-left:10px;margin-bottom:6px;border-top:1px solid var(--border)">
           <div style="display:flex;align-items:center;margin-bottom:4px">
-            <div onclick="openHistModal('${key}')" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 6px 12px 0;cursor:pointer;min-width:0">
+            <div onclick="openHistModal('${key}')" style="flex:1;display:flex;align-items:center;padding:12px 6px 12px 0;cursor:pointer;min-width:0">
               <span id="tname-${key}" style="color:${tColor};font-size:.88rem;font-weight:300;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tLabel}</span>
-              <span class="badge" style="font-size:.58rem;flex-shrink:0">${ss.length} 句</span>
             </div>
-            <button onclick="editTopicFromList('${key}')" style="background:transparent;border:none;color:var(--text3);padding:8px 6px;cursor:pointer;flex-shrink:0;line-height:0" title="編輯主題名稱">${SVG.pencil}</button>
+            <button onclick="editTopicFromList('${key}')" style="background:transparent;border:none;color:var(--text3);padding:8px 4px;cursor:pointer;flex-shrink:0;line-height:0" title="編輯主題名稱">${SVG.pencil}</button>
+            <span class="badge" style="font-size:.58rem;flex-shrink:0;margin-left:4px">${ss.length} 句</span>
           </div>
           <div style="display:flex;gap:5px;padding-bottom:2px;flex-wrap:wrap">
             ${bPlay}${bLoop}${bShadow}
